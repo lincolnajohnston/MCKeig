@@ -168,7 +168,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
     }
 }
 
-// What this should actually do: Given some intial source term (neutrons and their distribution), run some inactive cycles just like was done
+// What TFS should actually do I think: Given some intial source term (neutrons and their distribution), run some inactive cycles just like was done
 // in the k-eigenvalue function to get the correct shape of the neutrons, then start running active cycles, during this time, the 
 // delayed and censused neutrons will be added to a separate bank (with some probability to weight them into the current time step as well).
 // If the reactor isn't prompt supercritical, then over time the number of neutrons in the fission source iteration (for k calculation)
@@ -177,62 +177,6 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 // time step but the inactive cycles will still be repeated (keeping the same initial neutron population but changing distribution).
 // In a perfectly critical reactor, the delayed + censused neutron bank for each time step will have the same size equal to the size
 // of the bank of neutrons in the initial source term
-/*void runTransientFixedSource(Geometry *geo, double deltaT) {
-    int initial_particles = 10;  // initial particles spawned at the origin
-    int source_rate = 0;  // particles generated at every time step
-    int cycles = 200;
-    int inactive_cycles = 50;
-    double k_eig_sum = 0;
-    // create initial particle bank
-    std::vector<Particle> part_bank(initial_particles, Particle({0,0,0}, {1,0,0}, geo));
-    for(size_t i = 0; i < initial_particles; i++) {
-        part_bank[i] = (Particle({0,0,0}, {1,0,0}, geo));
-    }
-    std::vector<Particle> delayed_neutron_bank;
-
-    // run timesteps
-    int generated_particles = 0;
-    for (size_t cycle = 0; cycle < cycles; cycle++) {
-        std::cout << "--------------t = " << cycle * deltaT << "-----------" << std::endl;
-        std::cout << "Num Neutrons: " << part_bank.size() << "\n\n\n" << std::endl;
-        //std::vector<Particle> prompt_neutron_bank(generated_particles, Particle({0,0,0}, {1,0,0}, geo));
-        //std::vector<Particle> delayed_neutron_bank(generated_particles, Particle({0,0,0}, {1,0,0}, geo));
-        std::vector<Particle> generated_neutron_bank;
-        
-        // generate fixed source neutrons
-        Source *source = new Source(source_rate, geo);
-        source->generateParticles(part_bank);
-
-        initial_particles = part_bank.size();
-        generated_particles = 0;
-        // move particles in this generation
-        for (size_t i = 0; i < initial_particles; i++) {
-            Particle p = part_bank[i];
-            //std::cout << "New Particle" << std::endl;
-            
-            while(p.isAlive()) {
-                p.move(generated_neutron_bank, delayed_neutron_bank, generated_particles);
-            }
-            //std::cout << "Killed\n\n" << std::endl;
-        }
-        
-        // add delayed neutrons to bank
-        for (int i = delayed_neutron_bank.size() - 1; i >= 0; i--) {
-            Particle p = delayed_neutron_bank[i];
-            
-            // move particle from delayed to prompt group with probability based on decay constant of material of cell particle is in
-            double decayProb = 1 - exp(-1 * p.getCell()->getDecayConst() * deltaT);
-            if (Rand::getRand() < decayProb) {
-                generated_neutron_bank.push_back(p);
-                delayed_neutron_bank.erase(delayed_neutron_bank.begin() + i);
-            }
-
-        }
-        std::cout << "Delayed Neutron Length: " << delayed_neutron_bank.size() << std::endl;
-
-        part_bank = generated_neutron_bank;
-    }
-}*/
 
 Geometry *buildGeometry (std::string simType, double deltaT) {
 
