@@ -15,10 +15,12 @@ class Particle {
         Geometry *geo;
         Cell *currentCell;
         double epsilon = pow(10,-10);
+        double weight;
 
     public:
 
-    Particle(Position location, Direction direction, Geometry *geo):location(location), direction(direction), geo(geo) {
+    Particle(Position location, Direction direction, Geometry *geo, double weight = 1):location(location), direction(direction),
+         geo(geo), weight(weight) {
         currentCell = geo->cellAtLocation(location);
         alive = true;
     }
@@ -30,7 +32,11 @@ class Particle {
         return currentCell;
     }
 
-    void move(std::vector<Particle> &generated_neutron_bank, std::deque<Particle> &delayed_neutron_bank, int &source_particles) {
+    void multiplyWeight(double factor) {
+        weight = weight * factor;
+    }
+
+    void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, int &source_particles) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision();
         //std::cout << "Dist To Edge: " << edge_dist << std::endl;
@@ -56,35 +62,33 @@ class Particle {
             }
             else if (collision_name == "census") {
                 //std::cout << "Particle censused at " << location.x << ", " << location.y << ", " << location.z << std::endl;
-                if (source_particles >= generated_neutron_bank.size()) {
-                    generated_neutron_bank.push_back(*this);
-                }
-                else {
-                    generated_neutron_bank[source_particles] = *this;
-                }
+                delayed_neutron_bank.push_back(*this);
+
                 source_particles += 1;
                 alive = false;
             }
             else if (collision_name == "fis") {
                 //std::cout << "Particle fissioned at " << location.x << ", " << location.y << ", " << location.z << std::endl;
                 for (size_t i = 0; i < currentCell->getNu(); i++) {
+
+                    // implicit delayed and prompt neutrons
+                    /*direction.isotropicScatter();
+                    Particle delayed_particle = *this;
+                    direction.isotropicScatter();
+                    Particle prompt_particle = *this;
+                    delayed_particle.multiplyWeight(currentCell->getBeta());
+                    prompt_particle.multiplyWeight(1 - currentCell->getBeta());
+                    delayed_neutron_bank.push_back(delayed_particle);
+                    generated_neutron_bank.push_back(prompt_particle);*/
+
+                    // analog case
                     direction.isotropicScatter();
                     double ksi = Rand::getRand();
                     if (ksi < currentCell->getBeta()) {
-                        if (source_particles >= generated_neutron_bank.size()) {
-                            delayed_neutron_bank.push_back(*this);
-                        }
-                        else {
-                            delayed_neutron_bank[source_particles] = *this;
-                        }
+                        delayed_neutron_bank.push_back(*this);
                     }
                     else {
-                        if (source_particles >= generated_neutron_bank.size()) {
-                            generated_neutron_bank.push_back(*this);
-                        }
-                        else {
-                            generated_neutron_bank[source_particles] = *this;
-                        }
+                        generated_neutron_bank.push_back(*this);
                     }
                     
                     source_particles += 1;

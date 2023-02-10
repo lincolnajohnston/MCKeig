@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${fileDirname}\\${fileBasenameNoExtension}.exe",
             "args": [
-                "TFS"
+                "keig"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
