@@ -66,6 +66,7 @@ void runKEig(Geometry *geo) {
         
     }
 
+
     double avg_k_eig = k_eig_sum / (cycles - inactive_cycles);
     std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
 
