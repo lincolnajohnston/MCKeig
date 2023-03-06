@@ -25,6 +25,18 @@ class Geometry {
             return NULL;
         }
 
+        void clearTallies() {
+            for (Cell *cell:cells) {
+                cell->clearTL();
+            }
+        }
+
+        void printTallies() {
+            for (Cell *cell:cells) {
+                std::cout << cell->getName() << ": " << cell->getTLTally() << std::endl;
+            }
+        }
+
 };
 
 #endif

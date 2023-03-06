@@ -13,7 +13,7 @@ class Cell {
         std::vector<bool> senses;
         std::string name;
         Material *mat;
-        std::vector<std::string> xs_names;
+        double TLtally;
 
     public:
 
@@ -22,10 +22,11 @@ class Cell {
     }
 
     Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, Material *mat):name(name),
-        surfaces(surfs), senses(senses), mat(mat), xs_names({"total", "scat", "cap", "fis", "nu"}) {
+        surfaces(surfs), senses(senses), mat(mat) {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
+        TLtally = 0;
     }
 
     void addSurface(Surface  *surf, double sense) {
@@ -75,8 +76,8 @@ class Cell {
         return -1 * log(rand_val)/mat->getTotalXS();
     }
 
-    std::string sample_collision() {
-        double ksi = Rand::getRand();
+    std::string sample_collision(Rand &rng) {
+        double ksi = rng.getRand2();
 
         if (ksi < mat->getScatterXS() / mat->getTotalXS()) {
             return "scat";
@@ -90,6 +91,18 @@ class Cell {
         else {
             return "fis";
         }
+    }
+
+    void tallyTL(double dist, double weight) {
+        TLtally += dist * weight;
+    }
+
+    double getTLTally() {
+        return TLtally;
+    }
+
+    void clearTL() {
+        TLtally = 0;
     }
 
 };

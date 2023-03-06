@@ -60,9 +60,9 @@ class Direction {
         return k;
     }
 
-    void isotropicScatter() {
-        double mu = 2 * Rand::getRand() - 1;
-        double phi = 2 * M_PI * Rand::getRand();
+    void isotropicScatter(Rand &rng) {
+        double mu = 2 * rng.getRand2() - 1;
+        double phi = 2 * M_PI * rng.getRand2();
 
         i = mu;
         j = sqrt(1 - pow(mu,2)) * sin(phi);

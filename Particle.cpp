@@ -32,45 +32,44 @@ class Particle {
         return currentCell;
     }
 
+    void setWeight(double newWeight) {
+        weight = newWeight;
+    }
+
     void multiplyWeight(double factor) {
         weight = weight * factor;
     }
 
-    void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, int &source_particles) {
+    void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, int &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision();
-        //std::cout << "Dist To Edge: " << edge_dist << std::endl;
-        //std::cout << "Dist To Collision: " << collision_dist << std::endl;
 
         double move_dist = edge_dist + epsilon;
         if (collision_dist < edge_dist) {
-            move_dist = collision_dist + epsilon;
+            move_dist = collision_dist;
 
             location.x += move_dist * direction.getI();
             location.y += move_dist * direction.getJ();
             location.z += move_dist * direction.getK();
 
+            currentCell->tallyTL(move_dist, weight);
 
-            std::string collision_name = currentCell->sample_collision();
+
+            std::string collision_name = currentCell->sample_collision(rng);
             if (collision_name == "scat") {
-                //std::cout << "Particle scattered at " << location.x << ", " << location.y << ", " << location.z << std::endl;
-                direction.isotropicScatter();
+                direction.isotropicScatter(rng);
             }
             else if (collision_name == "cap") {
-                //std::cout << "Particle captured at " << location.x << ", " << location.y << ", " << location.z << std::endl;
                 alive = false;
             }
             else if (collision_name == "census") {
-                //std::cout << "Particle censused at " << location.x << ", " << location.y << ", " << location.z << std::endl;
                 delayed_neutron_bank.push_back(*this);
 
                 source_particles += 1;
                 alive = false;
             }
             else if (collision_name == "fis") {
-                //std::cout << "Particle fissioned at " << location.x << ", " << location.y << ", " << location.z << std::endl;
                 for (size_t i = 0; i < currentCell->getNu(); i++) {
-
                     // implicit delayed and prompt neutrons
                     /*direction.isotropicScatter();
                     Particle delayed_particle = *this;
@@ -82,10 +81,16 @@ class Particle {
                     generated_neutron_bank.push_back(prompt_particle);*/
 
                     // analog case
-                    direction.isotropicScatter();
-                    double ksi = Rand::getRand();
+                    direction.isotropicScatter(rng);
+                    double ksi = rng.getRand2();
                     if (ksi < currentCell->getBeta()) {
-                        delayed_neutron_bank.push_back(*this);
+                        Particle fission_source_del_neut = *this;
+                        fission_source_del_neut.f3WeightAdjust(timestep);
+                        Particle time_bank_del_neut = *this;
+                        time_bank_del_neut.f2WeightAdjust(timestep);
+
+                        generated_neutron_bank.push_back(fission_source_del_neut);
+                        delayed_neutron_bank.push_back(time_bank_del_neut);
                     }
                     else {
                         generated_neutron_bank.push_back(*this);
@@ -102,21 +107,38 @@ class Particle {
             location.y += move_dist * direction.getJ();
             location.z += move_dist * direction.getK();
 
+            currentCell->tallyTL(move_dist, weight);
+
             currentCell = geo->cellAtLocation(location);
 
+            // if particle leaked, kill it
             if (!currentCell) {
-                //std::cout << "Particle leaked at position: " << location.x << ", " << location.y << ", " << location.z << std::endl;
                 alive = false;
-            }
-            else {
-                //std::cout << "New Cell: " << currentCell->getName() << std::endl;
             }
         }
         
     }
 
+    double getWeight() {
+        return weight;
+    }
 
-    
+    // adjust weight by factor equal to probability of precursor surviving the length of the time step
+    void f1WeightAdjust(double timestep) {
+        multiplyWeight(exp(-1 * currentCell->getDecayConst() * timestep));
+    }
+
+    // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the next time step
+    void f2WeightAdjust(double timestep) {
+        double lambda = currentCell->getDecayConst();
+        multiplyWeight((1 - exp(-1 * lambda * timestep) - lambda * timestep * exp(-1 * lambda * timestep)) / (lambda * timestep));
+    }
+
+    // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the current fission source iteration
+    void f3WeightAdjust(double timestep) {
+        double lambda = currentCell->getDecayConst();
+        multiplyWeight(exp(-1 * lambda * timestep) * (1 - exp(lambda * timestep) + lambda * timestep * exp(lambda * timestep)) / (lambda * timestep));
+    }
 
     bool isAlive() {
         return alive;
