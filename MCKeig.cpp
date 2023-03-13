@@ -8,6 +8,7 @@
 #include "Geometry.cpp"
 #include "Material.cpp"
 #include "Source.cpp"
+#include "Input.cpp"
 
 #include <queue>
 #include <vector>
@@ -111,8 +112,8 @@ double sumBankWeights(std::vector<Particle> &bank) {
 
 void runTransientFixedSource(Geometry *geo, double deltaT) {
     Rand rng;
-    int initial_particles = 10000;
-    int delayed_bank_max_size = 10000;
+    int initial_particles = 100;
+    int delayed_bank_max_size = 100;
     int cycles = 100;
     int inactive_cycles = 50;
     // create particle bank for fission source iteration
@@ -138,7 +139,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             //std::cout << "--------------Cycle " << cycle << "-----------" << std::endl;
             //std::cout << "Num Neutrons: " << part_bank.size() << std::endl;
             std::vector<Particle> fission_source_bank; // neutrons that will be used in the next fission source iteration
-            int source_particles = 0;
+            double source_particles = 0;
 
             // run particles in current fission source step, add generated neutrons to banks for either next fission source step or time step
             for (size_t i = 0; i < part_bank.size(); i++) {
@@ -148,13 +149,14 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
                         p.move(fission_source_bank, delayed_neutron_bank, source_particles, deltaT, rng);
                     }
                     else {  // inactive cycles (don't add neutrons to delayed bank)
-                        p.move(fission_source_bank, fission_source_bank, source_particles, deltaT, rng);
+                        double trash_variable = 0;
+                        p.move(fission_source_bank, fission_source_bank, trash_variable, deltaT, rng);
                     }
                 }
             }
             //std::cout << "Source particles: " << source_particles << std::endl;
-            std::cout << "Delayed neutrons in bank: " << delayed_neutron_bank.size() << std::endl;
-            double k = 1.0 * source_particles / part_bank.size();
+            //std::cout << "Delayed neutrons in bank: " << delayed_neutron_bank.size() << std::endl;
+            double k = 1.0 * source_particles / sumBankWeights(part_bank);;
             if (cycle >= inactive_cycles) {
                 k_eig_sum += k;
             }
@@ -246,84 +248,22 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
     }
 }
 
-
-Geometry *buildGeometry (std::string simType, double deltaT) {
-
-    Plane *centerline = new Plane({0,0,0}, {1,0,0});
-
-    // define sphere of radius 1 centered at the origin
-    double sphereVelocity = 10000; // neutron velocity in cm/s
-    double sphereScatterXS = 5;
-    double sphereCapXS = 1.37;
-    double sphereCensusXS = 1 / (deltaT * sphereVelocity);
-    if (simType == "keig") {
-        sphereCensusXS = 0;
-    }
-    double sphereFisXS = 1.63;
-    double sphereNu = 2;
-    double sphereTotalXS = sphereScatterXS + sphereCapXS + sphereCensusXS + sphereFisXS;
-    double sphereBeta = 0.01;
-    double sphereDecayConst = 10; // units of decays per second
-    Material *sphereMat = new Material(sphereTotalXS, sphereScatterXS, sphereCapXS, sphereCensusXS, sphereFisXS, sphereNu, sphereBeta, sphereDecayConst);
-    Sphere *sphere = new Sphere({0,0,0}, 0.7937);
-    Cell *sphere_cell = new Cell("inner_sphere_1", {sphere, centerline}, {0, 0}, sphereMat);
-    Cell *sphere0_cell = new Cell("inner_sphere_2", {sphere, centerline}, {0, 1}, sphereMat);
-
-    // define sphere of radius 1 centered at the origin
-    double sphere2Velocity = 10000; // neutron velocity in cm/s
-    double sphere2ScatterXS = 5;
-    double sphere2CapXS = 1.37;
-    double sphere2CensusXS = 1 / (deltaT * sphereVelocity);
-    if (simType == "keig") {
-        sphere2CensusXS = 0;
-    }
-    double sphere2FisXS = 1.63;
-    double sphere2Nu = 2;
-    double sphere2TotalXS = sphere2ScatterXS + sphere2CapXS + sphere2CensusXS + sphere2FisXS;
-    double sphere2Beta = 0.01;
-    double sphere2DecayConst = 10; // units of decays per second
-    Material *sphere2Mat = new Material(sphere2TotalXS, sphere2ScatterXS, sphere2CapXS, sphere2CensusXS, sphere2FisXS, sphere2Nu, sphere2Beta, sphere2DecayConst);
-    Sphere *sphere2 = new Sphere({0,0,0}, 1);
-    Cell *sphere2_cell = new Cell("outer_sphere_1", {sphere2, sphere, centerline}, {0,1,0}, sphere2Mat);
-    Cell *sphere3_cell = new Cell("outer_sphere_2", {sphere2, sphere, centerline}, {0,1,1}, sphere2Mat);
-
-    // define a cube of side lengths 2, centered at the origin, cell excludes center sphere
-    double cubeVelocity = 10000; // neutron velocity in cm/s
-    double cubeScatterXS = 0;
-    double cubeCapXS = 2;
-    double cubeCensusXS = 1 / (deltaT * cubeVelocity);
-    if (simType == "keig") {
-        cubeCensusXS = 0;
-    }
-    double cubeFisXS = 2;
-    double cubeNu = 2;
-    double cubeTotalXS = cubeScatterXS + cubeCapXS + cubeCensusXS + cubeFisXS;
-    double cubeBeta = 0.01;
-    double cubeDecayConst = 10; // units of decays per second
-    Material *cubeMat = new Material(cubeTotalXS, cubeScatterXS, cubeCapXS, cubeCensusXS, cubeFisXS, cubeNu, cubeBeta, cubeDecayConst);
-    Plane *wall1 = new Plane({-1,0,0}, {1,0,0});
-    Plane *wall2 = new Plane({1,0,0}, {-1,0,0});
-    Plane *wall3 = new Plane({0,-1,0}, {0,1,0});
-    Plane *wall4 = new Plane({0,1,0}, {0,-1,0});
-    Plane *wall5 = new Plane({0,0,-1}, {0,0,1});
-    Plane *wall6 = new Plane({0,0,1}, {0,0,-1});
-    Cell *box = new Cell("outer_box", {wall1, wall2, wall3, wall4, wall5, wall6, sphere2}, {1, 1, 1, 1, 1, 1, 1}, cubeMat);
-
-    // add cells to geometry
-    Geometry *geo = new Geometry({sphere_cell, sphere0_cell, sphere2_cell, sphere3_cell, box});
-    return geo;
-}
-
 int main(int argc, char *argv[]) {
 
-    // Determine whether to run K-eigenvalue or Transient fixed source simulation based on command line input
+    // command line input
     std::string simType = "TFS";
     if (argc >= 2) {
         simType = argv[1];
     }
+    std::string input_file = "input.txt";
+    if (argc >= 3) {
+        input_file = argv[2];
+    }
 
     double deltaT = 0.01;
-    Geometry *geo = buildGeometry(simType, deltaT);
+
+    Input input(input_file);
+    Geometry *inputTestGeo = input.getGeometry();
 
     /*if (simType == "keig") {
         std::cout << "Running K-eigenvalue simulation" << std::endl;
@@ -333,9 +273,9 @@ int main(int argc, char *argv[]) {
         std::cout << "Running Transient Fixed Source simulation" << std::endl;
         runTransientFixedSource(geo, deltaT);
     }*/
-    runTransientFixedSource(geo, deltaT);
+    //runTransientFixedSource(geo, deltaT);
+    runTransientFixedSource(inputTestGeo, deltaT);
 
-    delete geo;
     return 0;
 }
 

@@ -40,7 +40,7 @@ class Particle {
         weight = weight * factor;
     }
 
-    void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, int &source_particles, double timestep, Rand& rng) {
+    void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, double &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision();
 
@@ -65,7 +65,7 @@ class Particle {
             else if (collision_name == "census") {
                 delayed_neutron_bank.push_back(*this);
 
-                source_particles += 1;
+                source_particles += this->getWeight();
                 alive = false;
             }
             else if (collision_name == "fis") {
@@ -96,7 +96,7 @@ class Particle {
                         generated_neutron_bank.push_back(*this);
                     }
                     
-                    source_particles += 1;
+                    source_particles += this->getWeight();
                 }
                 alive = false;
             }

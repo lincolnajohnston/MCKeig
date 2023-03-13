@@ -42,6 +42,9 @@
         "deque": "cpp",
         "algorithm": "cpp",
         "queue": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "cctype": "cpp",
+        "fstream": "cpp",
+        "string": "cpp"
     }
 }
