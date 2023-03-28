@@ -1,0 +1,31 @@
+!Simulation
+TFS 0.01  # simulation type, deltaT
+%
+!Materials
+sphereMat sphereMaterial.txt  # material name, cross section input file
+%
+!Surfaces
+sphere1 Sphere 0 0 0 0.1
+sphere2 Sphere 0 0 0 0.2
+sphere3 Sphere 0 0 0 0.3
+sphere4 Sphere 0 0 0 0.4
+sphere5 Sphere 0 0 0 0.5
+sphere6 Sphere 0 0 0 0.6
+sphere7 Sphere 0 0 0 0.7
+sphere8 Sphere 0 0 0 0.8
+sphere9 Sphere 0 0 0 0.9
+sphere10 Sphere 0 0 0 1.0
+%
+!Cells
+sphere_1 sphereMat -sphere1
+sphere_2 sphereMat sphere1 -sphere2
+sphere_3 sphereMat sphere2 -sphere3
+sphere_4 sphereMat sphere3 -sphere4
+sphere_5 sphereMat sphere4 -sphere5
+sphere_6 sphereMat sphere5 -sphere6
+sphere_7 sphereMat sphere6 -sphere7
+sphere_8 sphereMat sphere7 -sphere8
+sphere_9 sphereMat sphere8 -sphere9
+sphere_10 sphereMat sphere9 -sphere10
+%
+!Tallies

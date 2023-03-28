@@ -54,7 +54,6 @@ class Particle {
 
             currentCell->tallyTL(move_dist, weight);
 
-
             std::string collision_name = currentCell->sample_collision(rng);
             if (collision_name == "scat") {
                 direction.isotropicScatter(rng);

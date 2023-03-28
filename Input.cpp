@@ -128,7 +128,7 @@ class Input {
         if ( myfile.is_open() ) {
             while(std::getline(myfile, file_string)) {
                 std::cout << "line: " << file_string << std::endl;
-                if (file_string == "") {
+                if (file_string.rfind("%", 0) == 0) {
                     continue;
                 }
                 if (file_string.rfind("!", 0) == 0) {

@@ -112,8 +112,8 @@ double sumBankWeights(std::vector<Particle> &bank) {
 
 void runTransientFixedSource(Geometry *geo, double deltaT) {
     Rand rng;
-    int initial_particles = 100;
-    int delayed_bank_max_size = 100;
+    int initial_particles = 10000;
+    int delayed_bank_max_size = 10000;
     int cycles = 100;
     int inactive_cycles = 50;
     // create particle bank for fission source iteration
@@ -197,10 +197,12 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             double total_fission_source_weight = sumBankWeights(part_bank);
             std::cout << "part_bank weight: " << total_fission_source_weight << std::endl;
 
-            //geo->printTallies();
-            geo->clearTallies();
+            if (cycle == cycles - 1) {
+                geo->printTallies();
+            }
             
         }
+        geo->clearTallies();
 
         int n_delayed_neutrons = delayed_neutron_bank.size();
         double total_bank_weight = sumBankWeights(delayed_neutron_bank);
@@ -255,7 +257,7 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) {
         simType = argv[1];
     }
-    std::string input_file = "input.txt";
+    std::string input_file = "concentric-spheres.txt";
     if (argc >= 3) {
         input_file = argv[2];
     }
