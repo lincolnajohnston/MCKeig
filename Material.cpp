@@ -5,43 +5,49 @@
 
 class Material {
     private:
-        double totalXS;
-        double scatterXS;
-        double captureXS;
-        double censusXS;
-        double fissionXS;
-        double nu;
-        double beta;
-        double decayConst;
+        int groups;
+        std::vector<double> totalXS;
+        std::vector<double> scatterXS;
+        std::vector<std::vector<double>> scatterMatrixXS;
+        std::vector<double> captureXS;
+        std::vector<double> censusXS;
+        std::vector<double> fissionXS;
+        std::vector<double> nu;
+        std::vector<double> beta;
+        std::vector<double> decayConst;
     public:
-        Material(double totalXS, double scatterXS, double captureXS, double censusXS, double fissionXS, double nu, double beta, double decayConst):totalXS(totalXS), 
-            scatterXS(scatterXS), captureXS(captureXS), censusXS(censusXS), fissionXS(fissionXS), nu(nu), beta(beta), decayConst(decayConst){
+        Material(int groups, std::vector<double> totalXS, std::vector<double> scatterXS, std::vector<std::vector<double>> scatterMatrixXS, std::vector<double> captureXS, std::vector<double> censusXS,
+                 std::vector<double> fissionXS, std::vector<double> nu, std::vector<double> beta, std::vector<double> decayConst):groups(groups), totalXS(totalXS), 
+            scatterXS(scatterXS), scatterMatrixXS(scatterMatrixXS), captureXS(captureXS), censusXS(censusXS), fissionXS(fissionXS), nu(nu), beta(beta), decayConst(decayConst){
 
         }
 
-        double getTotalXS() {
-            return totalXS;
+        double getTotalXS(int group) {
+            return totalXS[group];
         }
-        double getScatterXS() {
-            return scatterXS;
+        double getScatterXS(int group) {
+            return scatterXS[group];
         }
-        double getCaptureXS() {
-            return captureXS;
+        std::vector<double> getScatterMatrixXS(int group) {
+            return scatterMatrixXS[group];
         }
-        double getCensusXS() {
-            return censusXS;
+        double getCaptureXS(int group) {
+            return captureXS[group];
         }
-        double getFissionXS() {
-            return fissionXS;
+        double getCensusXS(int group) {
+            return censusXS[group];
         }
-        double getNu() {
-            return nu;
+        double getFissionXS(int group) {
+            return fissionXS[group];
         }
-        double getBeta() {
-            return beta;
+        double getNu(int group) {
+            return nu[group];
         }
-        double getDecayConst() {
-            return decayConst;
+        double getBeta(int group) {
+            return beta[group];
+        }
+        double getDecayConst(int group) {
+            return decayConst[group];
         }
 
 };

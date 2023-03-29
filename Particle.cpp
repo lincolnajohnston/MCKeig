@@ -16,11 +16,12 @@ class Particle {
         Cell *currentCell;
         double epsilon = pow(10,-10);
         double weight;
+        int group;
 
     public:
 
-    Particle(Position location, Direction direction, Geometry *geo, double weight = 1):location(location), direction(direction),
-         geo(geo), weight(weight) {
+    Particle(Position location, Direction direction, Geometry *geo, double weight = 1, int group = 0):location(location), direction(direction),
+         geo(geo), weight(weight), group(group) {
         currentCell = geo->cellAtLocation(location);
         alive = true;
     }
@@ -42,7 +43,7 @@ class Particle {
 
     void move(std::vector<Particle> &generated_neutron_bank, std::vector<Particle> &delayed_neutron_bank, double &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
-        double collision_dist = currentCell->distToNextCollision();
+        double collision_dist = currentCell->distToNextCollision(group);
 
         double move_dist = edge_dist + epsilon;
         if (collision_dist < edge_dist) {
@@ -54,9 +55,10 @@ class Particle {
 
             currentCell->tallyTL(move_dist, weight);
 
-            std::string collision_name = currentCell->sample_collision(rng);
+            std::string collision_name = currentCell->sample_collision(rng, group);
             if (collision_name == "scat") {
                 direction.isotropicScatter(rng);
+                group = currentCell->sample_scatter_group(rng, group);
             }
             else if (collision_name == "cap") {
                 alive = false;
@@ -68,7 +70,7 @@ class Particle {
                 alive = false;
             }
             else if (collision_name == "fis") {
-                for (size_t i = 0; i < currentCell->getNu(); i++) {
+                for (size_t i = 0; i < currentCell->getNu(group); i++) {
                     // implicit delayed and prompt neutrons
                     /*direction.isotropicScatter();
                     Particle delayed_particle = *this;
@@ -82,7 +84,7 @@ class Particle {
                     // analog case
                     direction.isotropicScatter(rng);
                     double ksi = rng.getRand2();
-                    if (ksi < currentCell->getBeta()) {
+                    if (ksi < currentCell->getBeta(group)) {
                         Particle fission_source_del_neut = *this;
                         fission_source_del_neut.f3WeightAdjust(timestep);
                         Particle time_bank_del_neut = *this;
@@ -124,18 +126,18 @@ class Particle {
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
     void f1WeightAdjust(double timestep) {
-        multiplyWeight(exp(-1 * currentCell->getDecayConst() * timestep));
+        multiplyWeight(exp(-1 * currentCell->getDecayConst(group) * timestep));
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the next time step
     void f2WeightAdjust(double timestep) {
-        double lambda = currentCell->getDecayConst();
+        double lambda = currentCell->getDecayConst(group);
         multiplyWeight((1 - exp(-1 * lambda * timestep) - lambda * timestep * exp(-1 * lambda * timestep)) / (lambda * timestep));
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the current fission source iteration
     void f3WeightAdjust(double timestep) {
-        double lambda = currentCell->getDecayConst();
+        double lambda = currentCell->getDecayConst(group);
         multiplyWeight(exp(-1 * lambda * timestep) * (1 - exp(lambda * timestep) + lambda * timestep * exp(lambda * timestep)) / (lambda * timestep));
     }
 

@@ -59,37 +59,52 @@ class Cell {
         return name;
     }
 
-    double getNu() {
-        return mat->getNu();
+    double getNu(int group) {
+        return mat->getNu(group);
     }
 
-    double getBeta() {
-        return mat->getBeta();
+    double getBeta(int group) {
+        return mat->getBeta(group);
     }
 
-    double getDecayConst() {
-        return mat->getDecayConst();
+    double getDecayConst(int group) {
+        return mat->getDecayConst(group);
     }
 
-    double distToNextCollision() {
+    double distToNextCollision(int group) {
         double rand_val = ((double)rand())/(double)RAND_MAX;
-        return -1 * log(rand_val)/mat->getTotalXS();
+        return -1 * log(rand_val)/mat->getTotalXS(group);
     }
 
-    std::string sample_collision(Rand &rng) {
+    std::string sample_collision(Rand &rng, int group) {
         double ksi = rng.getRand2();
 
-        if (ksi < mat->getScatterXS() / mat->getTotalXS()) {
+        if (ksi < mat->getScatterXS(group) / mat->getTotalXS(group)) {
             return "scat";
         }
-        else if (ksi < (mat->getScatterXS() + mat->getCaptureXS()) / mat->getTotalXS()) {
+        else if (ksi < (mat->getScatterXS(group) + mat->getCaptureXS(group)) / mat->getTotalXS(group)) {
             return "cap";
         }
-        else if (ksi < (mat->getScatterXS() + mat->getCaptureXS() + mat->getCensusXS()) / mat->getTotalXS()) {
+        else if (ksi < (mat->getScatterXS(group) + mat->getCaptureXS(group) + mat->getCensusXS(group)) / mat->getTotalXS(group)) {
             return "census";
         }
         else {
             return "fis";
+        }
+    }
+
+    int sample_scatter_group(Rand &rng, int in_group) {
+        std::vector<double> scatter_mat = mat->getScatterMatrixXS(in_group);
+        double total_scatter_xs = mat->getScatterXS(in_group);
+
+        double ksi = rng.getRand2() * total_scatter_xs;
+        double scatterXSsum = 0;
+
+        for(int i = 0; i < scatter_mat.size(); i++) {
+            scatterXSsum += scatter_mat[i];
+            if (ksi < scatterXSsum) {
+                return i;
+            }
         }
     }
 

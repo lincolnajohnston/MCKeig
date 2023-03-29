@@ -63,18 +63,70 @@ class Input {
 
         std::ifstream myfile; 
         myfile.open(mat_file_name);
-        std::string totalXS, scatterXS, capXS, fisXS, nu, beta, decayConst;
-        getline(myfile, totalXS);
-        getline(myfile, scatterXS);
-        getline(myfile, capXS);
-        getline(myfile, fisXS);
-        getline(myfile, nu);
-        getline(myfile, beta);
-        getline(myfile, decayConst);
+        std::string group_str, totalXS_str, scatterXS_str, capXS_str, fisXS_str, nu_str, beta_str, decayConst_str;
 
-        double v = 10000;  // HARDCODED HERE, PUT delta_t in material class, energy in particle class
+        getline(myfile, group_str);
+        int groups = std::stoi(group_str);
 
-        Material *mat = new Material(std::stod(totalXS), std::stod(scatterXS), std::stod(capXS), 1 / (deltaT * v), std::stod(fisXS), std::stod(nu), std::stod(beta), std::stod(decayConst));
+        getline(myfile, totalXS_str);
+        getline(myfile, scatterXS_str);
+        getline(myfile, capXS_str);
+        getline(myfile, fisXS_str);
+        getline(myfile, nu_str);
+        getline(myfile, beta_str);
+        getline(myfile, decayConst_str);
+        std::cout << totalXS_str << std::endl;
+        std::cout << decayConst_str << std::endl;
+
+        std::stringstream totalXS_line(totalXS_str);
+        std::stringstream scatterXS_line(scatterXS_str);
+        std::stringstream capXS_line(capXS_str);
+        std::stringstream fisXS_line(fisXS_str);
+        std::stringstream nu_line(nu_str);
+        std::stringstream beta_line(beta_str);
+        std::stringstream decayConst_line(decayConst_str);
+
+        std::string totalXS_str_temp, scatterXS_str_temp, capXS_str_temp, fisXS_str_temp, nu_str_temp, beta_str_temp, decayConst_str_temp;
+        std::vector<double> totalXS, scatterXS, capXS, censusXS, fisXS, nu , beta, decayConst;
+        std::vector< std::vector<double> > scatter_matrix_XS;
+        scatter_matrix_XS.resize(groups);
+        double v = 10000;  // HARDCODED HERE, put delta_t in material class, energy in particle class
+        for (int i = 0; i < groups; i++) {
+            getline(totalXS_line, totalXS_str_temp, ' ');
+            totalXS.push_back(std::stod(totalXS_str_temp));
+
+            getline(scatterXS_line, scatterXS_str_temp, ' ');
+            scatterXS.push_back(std::stod(scatterXS_str_temp));
+
+            getline(capXS_line, capXS_str_temp, ' ');
+            capXS.push_back(std::stod(capXS_str_temp));
+
+            censusXS.push_back(1/v);
+
+            getline(fisXS_line, fisXS_str_temp, ' ');
+            fisXS.push_back(std::stod(fisXS_str_temp));
+
+            getline(nu_line, nu_str_temp, ' ');
+            nu.push_back(std::stod(nu_str_temp));
+
+            getline(beta_line, beta_str_temp, ' ');
+            beta.push_back(std::stod(beta_str_temp));
+
+            getline(decayConst_line, decayConst_str_temp, ' ');
+            decayConst.push_back(std::stod(decayConst_str_temp));
+
+            std::string scatter_matrix_str;
+            std::string scatter_matrix_str_temp;
+            getline(myfile, scatter_matrix_str);
+            std::stringstream scatter_matrix_line(scatter_matrix_str);
+            for (int j = 0; j < groups; j++) {
+                getline(scatter_matrix_line, scatter_matrix_str_temp, ' ');
+                scatter_matrix_XS[i].push_back(std::stod(scatter_matrix_str_temp));
+            }
+        }
+
+
+        Material *mat = new Material(groups, totalXS, scatterXS, scatter_matrix_XS, capXS, censusXS, fisXS, nu , beta, decayConst);
         materials.push_back(mat);
     }
 
