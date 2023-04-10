@@ -11,10 +11,7 @@ class Rand {
             rng.seed(12345);
         }
 
-    static double getRand() {
-        return ((double)rand())/(double)(RAND_MAX+1);
-    }
-    double getRand2() {
+    double getRand() {
         return (double)unif(rng);
     }
 };

@@ -1,0 +1,26 @@
+!Simulation
+TFS 0.01  # simulation type, deltaT
+%
+!Materials
+sphereMat sphereMaterial.txt  # material name, cross section input file
+cubeMat cubeMaterial.txt  # material name, cross section input file
+%
+!Surfaces
+centerline Plane 0 0 0 1 0 0
+sphere Sphere 0 0 0 0.7937
+sphere2 Sphere 0 0 0 1
+wall1 Plane -1 0 0 1 0 0
+wall2 Plane 1 0 0 -1 0 0
+wall3 Plane 0 -1 0 0 1 0
+wall4 Plane 0 1 0 0 -1 0
+wall5 Plane 0 0 -1 0 0 1
+wall6 Plane 0 0 1 0 0 -1
+%
+!Cells
+inner_sphere_1 sphereMat -sphere -centerline
+inner_sphere_2 sphereMat -sphere centerline
+outer_sphere_1 sphereMat -sphere2 sphere -centerline
+outer_sphere_2 sphereMat -sphere2 sphere centerline
+outer_box cubeMat wall1 wall2 wall3 wall4 wall5 wall6 sphere2
+%
+!Tallies

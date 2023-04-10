@@ -14,6 +14,10 @@ class Cell {
         std::string name;
         Material *mat;
         double TLtally;
+        std::vector<double> adjoint_flux;
+        double volume;
+        double adjoint_flux_sum;
+        double adjoint_beta_sum;
 
     public:
 
@@ -21,12 +25,14 @@ class Cell {
 
     }
 
-    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, Material *mat):name(name),
-        surfaces(surfs), senses(senses), mat(mat) {
+    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, Material *mat, std::vector<double> adjoint_flux, double volume = 0):name(name),
+        surfaces(surfs), senses(senses), mat(mat), adjoint_flux(adjoint_flux), volume(volume) {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
         TLtally = 0;
+        adjoint_flux_sum = 0;
+        adjoint_beta_sum = 0;
     }
 
     void addSurface(Surface  *surf, double sense) {
@@ -77,7 +83,7 @@ class Cell {
     }
 
     std::string sample_collision(Rand &rng, int group) {
-        double ksi = rng.getRand2();
+        double ksi = rng.getRand();
 
         if (ksi < mat->getScatterXS(group) / mat->getTotalXS(group)) {
             return "scat";
@@ -97,7 +103,7 @@ class Cell {
         std::vector<double> scatter_mat = mat->getScatterMatrixXS(in_group);
         double total_scatter_xs = mat->getScatterXS(in_group);
 
-        double ksi = rng.getRand2() * total_scatter_xs;
+        double ksi = rng.getRand() * total_scatter_xs;
         double scatterXSsum = 0;
 
         for(int i = 0; i < scatter_mat.size(); i++) {
@@ -118,6 +124,29 @@ class Cell {
 
     void clearTL() {
         TLtally = 0;
+    }
+
+    double getVolume() {
+        return volume;
+    }
+
+    double getAdjointFlux(double g) {
+        return adjoint_flux[g];
+    }
+
+    void tallyBeta(double beta_tally, double g) {
+        adjoint_flux_sum += adjoint_flux[g];
+        adjoint_beta_sum += beta_tally * adjoint_flux[g];
+    }
+
+    void resetBetas() {
+        adjoint_flux_sum = 0;
+        adjoint_beta_sum = 0;
+    }
+
+    void addBetaTallies(double &adjoint_flux_outer_sum, double &adjoint_beta_outer_sum) {
+        adjoint_flux_outer_sum += adjoint_flux_sum;
+        adjoint_beta_outer_sum += adjoint_beta_sum;
     }
 
 };

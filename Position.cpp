@@ -61,8 +61,8 @@ class Direction {
     }
 
     void isotropicScatter(Rand &rng) {
-        double mu = 2 * rng.getRand2() - 1;
-        double phi = 2 * M_PI * rng.getRand2();
+        double mu = 2 * rng.getRand() - 1;
+        double phi = 2 * M_PI * rng.getRand();
 
         i = mu;
         j = sqrt(1 - pow(mu,2)) * sin(phi);

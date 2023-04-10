@@ -15,65 +15,6 @@
 #include <random>
 #include <algorithm>
 
-/*void runKEig(Geometry *geo) {
-    int initial_particles = 100000;
-    int cycles = 100;
-    int inactive_cycles = 50;
-    double k_eig_sum = 0;
-    // create particle bank
-    std::vector<Particle> part_bank(initial_particles, Particle({0,0,0}, {1,0,0}, geo));
-    for(size_t i = 0; i < initial_particles; i++) {
-        part_bank[i] = (Particle({0,0,0}, {1,0,0}, geo));
-    }
-
-    for (size_t cycle = 0; cycle < cycles; cycle++) {
-        std::cout << "--------------Cycle " << cycle << "-----------" << std::endl;
-        std::cout << "Num Neutrons: " << part_bank.size() << std::endl;
-        //std::vector<Particle> prompt_neutron_bank(initial_particles, Particle({0,0,0}, {1,0,0}, geo));
-        std::vector<Particle> fission_source_bank;
-        //std::vector<Particle> delayed_neutron_bank;
-        int source_particles = 0;
-        // run particles
-        for (size_t i = 0; i < initial_particles; i++) {
-            Particle p = part_bank[i];
-            //std::cout << "New Particle" << std::endl;
-            
-            while(p.isAlive()) {
-                p.move(fission_source_bank, fission_source_bank, source_particles);
-            }
-            //std::cout << "Killed\n\n" << std::endl;
-        }
-        double k = 1.0 * source_particles / initial_particles;
-        if (cycle >= inactive_cycles) {
-            k_eig_sum += k;
-        }
-        std::cout << "k = " << k << " for this cycle\n" << std::endl;
-
-        // Repeat particle locations if number of neutrons decreased in this generation
-        if (source_particles < initial_particles) {
-            int new_particles = initial_particles - source_particles;
-            for (size_t i = 0; i < new_particles; i++) {
-                int random_index = floor(Rand::getRand() * source_particles);
-                fission_source_bank.push_back(fission_source_bank[random_index]);
-            }
-            part_bank = fission_source_bank;
-        }
-        // Randomly sample fission neutron locations if neutron population increased this generation
-        else if (source_particles > initial_particles) {
-            for (size_t i = 0; i < initial_particles; i++) {
-                int random_index = floor(Rand::getRand() * source_particles);
-                part_bank[i] = fission_source_bank[random_index];
-            }
-        }
-        
-    }
-
-
-    double avg_k_eig = k_eig_sum / (cycles - inactive_cycles);
-    std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
-
-}*/
-
 // lowerWeight must be less than 1
 void weightWindows(std::vector<Particle> &bank, double lowerWeight, double upperWeight, double survivalWeight, Rand& rng) {
     std::vector<Particle> temp_bank;
@@ -82,7 +23,7 @@ void weightWindows(std::vector<Particle> &bank, double lowerWeight, double upper
         i = i + 1;
         // roulette
         if(p.getWeight() < lowerWeight) {
-            if(rng.getRand2() < p.getWeight() / survivalWeight){
+            if(rng.getRand() < p.getWeight() / survivalWeight){
                 p.setWeight(survivalWeight);
                 temp_bank.push_back(p);
             }
@@ -128,6 +69,8 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
         double k_eig_sum = 0;
 
         double inactive_weight = sumBankWeights(part_bank);
+        double beta_adjoint_sum = 0;
+        double adjoint_sum = 0;
 
         // adjust weights of delayed neutrons for next time step (term 3 in Evan's dissertation TFS equation)
         for (Particle &p:delayed_neutron_bank) {
@@ -172,7 +115,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
                 if (n_fission_source_neutrons < initial_particles) {
                     //int new_particles = part_bank.size() - n_fission_source_neutrons;
                     for (size_t i = 0; i < initial_particles; i++) {
-                        int random_index = floor(rng.getRand2() * n_fission_source_neutrons);
+                        int random_index = floor(rng.getRand() * n_fission_source_neutrons);
                         fission_source_bank.push_back(fission_source_bank[random_index]);
                     }
                     part_bank = fission_source_bank;
@@ -198,10 +141,16 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             std::cout << "part_bank weight: " << total_fission_source_weight << std::endl;
 
             if (cycle == cycles - 1) {
-                geo->printTallies();
+                geo->printFluxes();
+            }
+            if (cycle == inactive_cycles - 1) {
+                geo->clearTallies();
             }
             
         }
+        double avg_beta = geo->getAverageBeta();
+        std::cout << "Average Beta: " << avg_beta << std::endl;
+
         geo->clearTallies();
 
         int n_delayed_neutrons = delayed_neutron_bank.size();
@@ -244,6 +193,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             }
         }
 
+        // Print eigenvalue results for this time step
         double avg_k_eig = k_eig_sum / (cycles - inactive_cycles);
         std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
         std::cout << "Total particles: " << part_bank.size() << std::endl;
@@ -267,15 +217,6 @@ int main(int argc, char *argv[]) {
     Input input(input_file);
     Geometry *inputTestGeo = input.getGeometry();
 
-    /*if (simType == "keig") {
-        std::cout << "Running K-eigenvalue simulation" << std::endl;
-        runKEig(geo);
-    }
-    else if (simType == "TFS") {
-        std::cout << "Running Transient Fixed Source simulation" << std::endl;
-        runTransientFixedSource(geo, deltaT);
-    }*/
-    //runTransientFixedSource(geo, deltaT);
     runTransientFixedSource(inputTestGeo, deltaT);
 
     return 0;

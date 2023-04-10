@@ -16,12 +16,13 @@ class Particle {
         Cell *currentCell;
         double epsilon = pow(10,-10);
         double weight;
+        int delayed_group;
         int group;
 
     public:
 
     Particle(Position location, Direction direction, Geometry *geo, double weight = 1, int group = 0):location(location), direction(direction),
-         geo(geo), weight(weight), group(group) {
+         geo(geo), weight(weight), group(group), delayed_group(1) {
         currentCell = geo->cellAtLocation(location);
         alive = true;
     }
@@ -83,18 +84,24 @@ class Particle {
 
                     // analog case
                     direction.isotropicScatter(rng);
-                    double ksi = rng.getRand2();
-                    if (ksi < currentCell->getBeta(group)) {
+                    double ksi = rng.getRand();
+                    if (ksi < currentCell->getBeta(group)) { // delayed neutron
                         Particle fission_source_del_neut = *this;
                         fission_source_del_neut.f3WeightAdjust(timestep);
+                        fission_source_del_neut.sampleDelayedNeutronEnergy();
+
                         Particle time_bank_del_neut = *this;
                         time_bank_del_neut.f2WeightAdjust(timestep);
+                        time_bank_del_neut.sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         delayed_neutron_bank.push_back(time_bank_del_neut);
+
+                        currentCell->tallyBeta(1, group); // tally that delayed fission took place with adjoint weighting
                     }
-                    else {
+                    else { // prompt neutron
                         generated_neutron_bank.push_back(*this);
+                        currentCell->tallyBeta(0, group); // tally that prompt fission took place with adjoint weighting
                     }
                     
                     source_particles += this->getWeight();
@@ -143,6 +150,10 @@ class Particle {
 
     bool isAlive() {
         return alive;
+    }
+
+    void sampleDelayedNeutronEnergy() {
+        group = delayed_group;
     }
 
 };
