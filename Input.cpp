@@ -17,6 +17,7 @@ class Input {
         std::vector<std::string> material_names;
         std::vector<Cell *> cells;
         double deltaT;
+        int groups;
         std::string simType;
 
         Input(std::string input_file_name):input_file_name(input_file_name) { }
@@ -174,7 +175,7 @@ class Input {
             cellSurfaces.push_back(surfaces[surf_index]);
         }
         double volume = std::stod(surf_name);
-        cells.push_back(new Cell(cell_name, cellSurfaces, senses, mat, adjoint_flux[cells.size()], volume));
+        cells.push_back(new Cell(cell_name, cellSurfaces, senses, groups, mat, adjoint_flux[cells.size()], volume));
     }
 
     void readAdjointFlux(std::string adjoint_flux_filename) {
@@ -248,6 +249,9 @@ class Input {
                                 std::string delta_t_string;
                                 getline(line, delta_t_string, ' ');
                                 deltaT = std::stod(delta_t_string);
+                                std::string group_string;
+                                getline(line, group_string, ' ');
+                                groups = std::stoi(group_string);
                             }
                             else if (identifier == "adjoint_flux") {
                                 std::string adjoint_flux_filename;
@@ -283,7 +287,7 @@ class Input {
                 }
             }
         }
-        return new Geometry(cells);
+        return new Geometry(cells, groups);
     }
 };
 

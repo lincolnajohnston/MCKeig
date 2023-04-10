@@ -74,7 +74,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
         // adjust weights of delayed neutrons for next time step (term 3 in Evan's dissertation TFS equation)
         for (Particle &p:delayed_neutron_bank) {
-            p.f1WeightAdjust(deltaT);
+            p.f1WeightAdjust(deltaT, 1); // hardcode group 1 as delayed neutron group
         }
 
         // fission source iteration
@@ -148,8 +148,11 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             }
             
         }
-        double avg_beta = geo->getAverageBeta();
-        std::cout << "Average Beta: " << avg_beta << std::endl;
+        double beta_eff;
+        double lambda_eff;
+        geo->getAverageBetaAndLambda(beta_eff, lambda_eff);
+        std::cout << "Beta-eff: " << beta_eff << std::endl;
+        std::cout << "Lambda-eff: " << lambda_eff << std::endl;
 
         geo->clearTallies();
 
@@ -207,7 +210,7 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) {
         simType = argv[1];
     }
-    std::string input_file = "concentric-spheres.txt";
+    std::string input_file = "Inputs/concentric-spheres.txt";
     if (argc >= 3) {
         input_file = argv[2];
     }

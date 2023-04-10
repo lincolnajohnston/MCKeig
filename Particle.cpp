@@ -16,13 +16,14 @@ class Particle {
         Cell *currentCell;
         double epsilon = pow(10,-10);
         double weight;
-        int delayed_group;
         int group;
+        int delayed_group;
+        int prompt_group;
 
     public:
 
     Particle(Position location, Direction direction, Geometry *geo, double weight = 1, int group = 0):location(location), direction(direction),
-         geo(geo), weight(weight), group(group), delayed_group(1) {
+         geo(geo), weight(weight), group(group), delayed_group(1), prompt_group(0) {
         currentCell = geo->cellAtLocation(location);
         alive = true;
     }
@@ -54,7 +55,7 @@ class Particle {
             location.y += move_dist * direction.getJ();
             location.z += move_dist * direction.getK();
 
-            currentCell->tallyTL(move_dist, weight);
+            currentCell->tallyTL(move_dist, weight, group);
 
             std::string collision_name = currentCell->sample_collision(rng, group);
             if (collision_name == "scat") {
@@ -87,21 +88,23 @@ class Particle {
                     double ksi = rng.getRand();
                     if (ksi < currentCell->getBeta(group)) { // delayed neutron
                         Particle fission_source_del_neut = *this;
-                        fission_source_del_neut.f3WeightAdjust(timestep);
+                        fission_source_del_neut.f3WeightAdjust(timestep,1); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut.sampleDelayedNeutronEnergy();
 
                         Particle time_bank_del_neut = *this;
-                        time_bank_del_neut.f2WeightAdjust(timestep);
+                        time_bank_del_neut.f2WeightAdjust(timestep, 1); // hardcode group 1 as delayed neutron group
                         time_bank_del_neut.sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         delayed_neutron_bank.push_back(time_bank_del_neut);
 
-                        currentCell->tallyBeta(1, group); // tally that delayed fission took place with adjoint weighting
+                        currentCell->tallyBeta(1, delayed_group); // tally that delayed fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     else { // prompt neutron
-                        generated_neutron_bank.push_back(*this);
-                        currentCell->tallyBeta(0, group); // tally that prompt fission took place with adjoint weighting
+                        Particle prompt_neut = *this;
+                        prompt_neut.samplePromptNeutronEnergy();
+                        generated_neutron_bank.push_back(prompt_neut);
+                        currentCell->tallyBeta(0, prompt_group); // tally that prompt fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     
                     source_particles += this->getWeight();
@@ -115,7 +118,7 @@ class Particle {
             location.y += move_dist * direction.getJ();
             location.z += move_dist * direction.getK();
 
-            currentCell->tallyTL(move_dist, weight);
+            currentCell->tallyTL(move_dist, weight, group);
 
             currentCell = geo->cellAtLocation(location);
 
@@ -132,19 +135,19 @@ class Particle {
     }
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
-    void f1WeightAdjust(double timestep) {
-        multiplyWeight(exp(-1 * currentCell->getDecayConst(group) * timestep));
+    void f1WeightAdjust(double timestep, int delayed_group) {
+        multiplyWeight(exp(-1 * currentCell->getDecayConst(delayed_group) * timestep));
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the next time step
-    void f2WeightAdjust(double timestep) {
-        double lambda = currentCell->getDecayConst(group);
+    void f2WeightAdjust(double timestep, int delayed_group) {
+        double lambda = currentCell->getDecayConst(delayed_group);
         multiplyWeight((1 - exp(-1 * lambda * timestep) - lambda * timestep * exp(-1 * lambda * timestep)) / (lambda * timestep));
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the current fission source iteration
-    void f3WeightAdjust(double timestep) {
-        double lambda = currentCell->getDecayConst(group);
+    void f3WeightAdjust(double timestep, int delayed_group) {
+        double lambda = currentCell->getDecayConst(delayed_group);
         multiplyWeight(exp(-1 * lambda * timestep) * (1 - exp(lambda * timestep) + lambda * timestep * exp(lambda * timestep)) / (lambda * timestep));
     }
 
@@ -152,8 +155,16 @@ class Particle {
         return alive;
     }
 
+    // sample an energy group for this particle if it originates from a delayed neutron event
     void sampleDelayedNeutronEnergy() {
+        // TODO: More accurately sample energy group when there are more than 2 groups
         group = delayed_group;
+    }
+
+    // sample an energy group for this particle if it originates from a prompt fission
+    void samplePromptNeutronEnergy() {
+        // TODO: More accurately sample energy group when there are more than 2 groups
+        group = prompt_group;
     }
 
 };

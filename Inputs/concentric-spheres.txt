@@ -1,8 +1,10 @@
 !Simulation
-TFS 0.01  # simulation type, deltaT
+TFS 0.01 2 # simulation type, deltaT, energy groups
+adjoint_flux Inputs/concentric-spheres-adjoint.txt
 %
 !Materials
-sphereMat sphereMaterial.txt  # material name, cross section input file
+sphereMat Inputs/sphereMaterial.txt  # material name, cross section input file
+sphereMatHighBeta Inputs/sphereMaterial-highBeta.txt
 %
 !Surfaces
 sphere1 Sphere 0 0 0 0.1

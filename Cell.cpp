@@ -12,12 +12,14 @@ class Cell {
         std::vector<Surface *> surfaces;
         std::vector<bool> senses;
         std::string name;
+        int groups;
         Material *mat;
-        double TLtally;
+        std::vector<double> TLtally;
         std::vector<double> adjoint_flux;
         double volume;
         double adjoint_flux_sum;
         double adjoint_beta_sum;
+        double adjoint_lambda_sum;
 
     public:
 
@@ -25,12 +27,11 @@ class Cell {
 
     }
 
-    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, Material *mat, std::vector<double> adjoint_flux, double volume = 0):name(name),
-        surfaces(surfs), senses(senses), mat(mat), adjoint_flux(adjoint_flux), volume(volume) {
+    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, int groups, Material *mat, std::vector<double> adjoint_flux, double volume = 0):name(name),
+        surfaces(surfs), senses(senses), groups(groups), mat(mat), TLtally(groups, 0), adjoint_flux(adjoint_flux), volume(volume) {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
-        TLtally = 0;
         adjoint_flux_sum = 0;
         adjoint_beta_sum = 0;
     }
@@ -114,16 +115,18 @@ class Cell {
         }
     }
 
-    void tallyTL(double dist, double weight) {
-        TLtally += dist * weight;
+    void tallyTL(double dist, double weight, int group) {
+        TLtally[group] += dist * weight;
     }
 
-    double getTLTally() {
-        return TLtally;
+    double getTLTally(int group) {
+        return TLtally[group];
     }
 
     void clearTL() {
-        TLtally = 0;
+        for (int g = 0; g < groups; g++) {
+            TLtally[g] = 0;
+        }
     }
 
     double getVolume() {
@@ -137,16 +140,19 @@ class Cell {
     void tallyBeta(double beta_tally, double g) {
         adjoint_flux_sum += adjoint_flux[g];
         adjoint_beta_sum += beta_tally * adjoint_flux[g];
+        adjoint_lambda_sum += getDecayConst(g) * adjoint_flux[g];
     }
 
     void resetBetas() {
         adjoint_flux_sum = 0;
         adjoint_beta_sum = 0;
+        adjoint_lambda_sum = 0;
     }
 
-    void addBetaTallies(double &adjoint_flux_outer_sum, double &adjoint_beta_outer_sum) {
+    void addBetaTallies(double &adjoint_flux_outer_sum, double &adjoint_beta_outer_sum, double &adjoint_lambda_outer_sum) {
         adjoint_flux_outer_sum += adjoint_flux_sum;
         adjoint_beta_outer_sum += adjoint_beta_sum;
+        adjoint_lambda_outer_sum += adjoint_lambda_sum;
     }
 
 };
