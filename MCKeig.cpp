@@ -72,10 +72,11 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
     // progress through time steps
     for (double t = 0; t < deltaT * 20; t=t + deltaT) {
         double k_eig_sum = 0;
+        double lifetime_sum = 0;
+        double beta_eff_sum = 0;
+        int adjoint_weighted_cycles = 0;
 
         double inactive_weight = sumBankWeights(part_bank);
-        double beta_adjoint_sum = 0;
-        double adjoint_sum = 0;
 
         // adjust weights of delayed neutrons for next time step (term 3 in Evan's dissertation TFS equation)
         for (std::shared_ptr<Particle> p:delayed_neutron_bank) {
@@ -108,7 +109,8 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             if (cycle >= inactive_cycles) {
                 k_eig_sum += k;
             }
-            std::cout << "k = " << k << " for this cycle" << std::endl;
+            std::cout << "k = " << k << " for cycle " << cycle << std::endl;
+
 
             if (cycle >= inactive_cycles) {  // active cycles (particles are lost to delayed bank)
                 part_bank = fission_source_bank;
@@ -144,6 +146,21 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
             double total_fission_source_weight = sumBankWeights(part_bank);
             std::cout << "part_bank weight: " << total_fission_source_weight << "\n" << std::endl;
+
+            // calculate "adjoint weighted" lifetime for 10 generations back
+            if (cycle > inactive_cycles + 10) {
+                double lifetimeTotal = 0;
+                double betaTotal = 0;
+                for (std::shared_ptr<Particle> p:part_bank) {
+                    lifetimeTotal += p->getLifetimeContribution(10);
+                    betaTotal += p->getBetaContribution(1, 10);
+                }
+                //std::cout << "Effective Lifetime: " << lifetimeTotal / total_fission_source_weight << std::endl;
+                //std::cout << "Beta Effective: " << betaTotal / total_fission_source_weight << std::endl;
+                lifetime_sum += lifetimeTotal / total_fission_source_weight;
+                beta_eff_sum += betaTotal / total_fission_source_weight;
+                adjoint_weighted_cycles++;
+            }
 
             if (cycle == cycles - 1) {
                 geo->printFluxes();
@@ -196,9 +213,13 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             }
         }
 
-        // Print eigenvalue results for this time step
+        // Print results for this time step
         double avg_k_eig = k_eig_sum / (cycles - inactive_cycles);
+        double avg_lifetime = lifetime_sum / adjoint_weighted_cycles;
+        double avg_beta_eff = beta_eff_sum / adjoint_weighted_cycles;
         std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
+        std::cout << "Average lifetime from last " << adjoint_weighted_cycles << " active cycles: " << avg_lifetime << std::endl;
+        std::cout << "Average beta-eff from last " << adjoint_weighted_cycles << " active cycles: " << avg_beta_eff << std::endl;
         std::cout << "Total particles: " << part_bank.size() << std::endl;
     }
 }
@@ -210,12 +231,12 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) {
         simType = argv[1];
     }
-    std::string input_file = "Inputs/concentric-spheres.txt";
+    std::string input_file = "Inputs/concentric-spheres-2.txt";
     if (argc >= 3) {
         input_file = argv[2];
     }
 
-    double deltaT = 0.01;
+    double deltaT = 1;
 
     Input input(input_file);
     Geometry *inputTestGeo = input.getGeometry();

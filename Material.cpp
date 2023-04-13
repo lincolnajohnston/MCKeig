@@ -46,6 +46,9 @@ class Material {
         double getFissionXS(int group) {
             return fissionXS[group];
         }
+        double getVelocity(int group) {
+            return velo[group];
+        }
         double getNu(int group) {
             return nu[group];
         }

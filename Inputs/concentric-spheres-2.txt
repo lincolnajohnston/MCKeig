@@ -2,7 +2,7 @@
 TFS 0.01 2 # simulation type, deltaT, energy groups
 %
 !Materials
-sphereMat Inputs/sphereMaterial.txt  # material name, cross section input file
+sphereMat Inputs/sphereMaterial2.txt  # material name, cross section input file
 %
 !Surfaces
 sphere1 Sphere 0 0 0 0.1

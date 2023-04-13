@@ -4,6 +4,7 @@
 #include "Position.cpp"
 #include "Cell.cpp"
 #include "Geometry.cpp"
+#include "Progenitor.cpp"
 #include <queue>
 #include <vector>
 #include <memory>
@@ -20,6 +21,8 @@ class Particle {
         int group;
         int delayed_group;
         int prompt_group;
+        double travel_time;
+        std::shared_ptr<Progenitor> prog;
 
     public:
 
@@ -51,6 +54,7 @@ class Particle {
         double move_dist = edge_dist + epsilon;
         if (collision_dist < move_dist) {
             move_dist = collision_dist;
+            travel_time += move_dist / currentCell->getVelocity(group);
 
             location.x += move_dist * direction.getI();
             location.y += move_dist * direction.getJ();
@@ -73,22 +77,18 @@ class Particle {
                 alive = false;
             }
             else if (collision_name == "fis") {
+                std::shared_ptr<Progenitor> current_prog = prog;
+                double progeny_travel_time = travel_time;
+                travel_time = 0;
                 for (size_t i = 0; i < currentCell->getNu(group); i++) {
-                    // implicit delayed and prompt neutrons
-                    /*direction.isotropicScatter();
-                    Particle delayed_particle = *this;
-                    direction.isotropicScatter();
-                    Particle prompt_particle = *this;
-                    delayed_particle.multiplyWeight(currentCell->getBeta());
-                    prompt_particle.multiplyWeight(1 - currentCell->getBeta());
-                    delayed_neutron_bank.push_back(delayed_particle);
-                    generated_neutron_bank.push_back(prompt_particle);*/
+                    // implicit case to be implemented
 
                     // analog case
                     direction.isotropicScatter(rng);
                     double ksi = rng.getRand();
                     if (ksi < currentCell->getBeta()) { // delayed neutron
                         int del_group = currentCell->sampleDelayedGroup(rng);
+                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, del_group, current_prog);
                         std::shared_ptr<Particle> fission_source_del_neut = std::make_shared<Particle>(*this);
                         fission_source_del_neut->f3WeightAdjust(timestep,del_group); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
@@ -100,13 +100,12 @@ class Particle {
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         delayed_neutron_bank.push_back(time_bank_del_neut);
 
-                        // tally that delayed fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     else { // prompt neutron
+                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, -1, current_prog);
                         std::shared_ptr<Particle> prompt_neut = std::make_shared<Particle>(*this);
                         prompt_neut->samplePromptNeutronEnergy();
                         generated_neutron_bank.push_back(prompt_neut);
-                        // tally that prompt fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     
                     source_particles += this->getWeight();
@@ -116,6 +115,8 @@ class Particle {
             
         }
         else {
+            travel_time += move_dist / currentCell->getVelocity(group);
+
             location.x += move_dist * direction.getI();
             location.y += move_dist * direction.getJ();
             location.z += move_dist * direction.getK();
@@ -134,6 +135,10 @@ class Particle {
 
     double getWeight() {
         return weight;
+    }
+
+    double getTravelTime() {
+        return travel_time;
     }
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
@@ -167,6 +172,26 @@ class Particle {
     void samplePromptNeutronEnergy() {
         // TODO: More accurately sample energy group when there are more than 2 groups
         group = prompt_group;
+    }
+
+    double getLifetimeContribution(int generations_back) {
+        std::shared_ptr<Progenitor> temp_prog = prog;
+        for (int i = 0; i < generations_back - 1; i++) {
+            temp_prog = prog->getProg();
+        }
+        return weight * temp_prog->getTravelTime();
+    }
+
+    double getBetaContribution(int delayed_group, int generations_back) {
+        std::shared_ptr<Progenitor> temp_prog = prog;
+        for (int i = 0; i < generations_back - 1; i++) {
+            temp_prog = prog->getProg();
+        }
+
+        if (temp_prog->getDelayedGroup() >= 0) {
+            return weight;
+        }
+        return 0;
     }
 
 };

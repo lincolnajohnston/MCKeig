@@ -182,30 +182,7 @@ class Input {
             cellSurfaces.push_back(surfaces[surf_index]);
         }
         double volume = std::stod(surf_name);
-        cells.push_back(new Cell(cell_name, cellSurfaces, senses, energy_groups, mat, adjoint_flux[cells.size()], volume));
-    }
-
-    void readAdjointFlux(std::string adjoint_flux_filename) {
-        std::ifstream myfile; 
-        myfile.open(adjoint_flux_filename);
-        std::string flux_line;
-        std::string groups_string;
-
-        getline(myfile, groups_string);
-        int groups = std::stoi(groups_string);
-
-        std::string adjoint_flux_str;
-        int cell_num = 0;
-        while(getline(myfile, flux_line)) {
-            std::stringstream line(flux_line);
-            adjoint_flux.resize(cell_num + 1);
-            for (int j = 0; j < groups; j++) {
-                getline(line, adjoint_flux_str, ' ');
-                adjoint_flux[cell_num].push_back(std::stod(adjoint_flux_str));
-            }
-            cell_num++;
-        }
-
+        cells.push_back(new Cell(cell_name, cellSurfaces, senses, energy_groups, mat, volume));
     }
 
     // create and return geometry using the input file specified in the creation of the Input object
@@ -259,11 +236,6 @@ class Input {
                                 std::string group_string;
                                 getline(line, group_string, ' ');
                                 energy_groups = std::stoi(group_string);
-                            }
-                            else if (identifier == "adjoint_flux") {
-                                std::string adjoint_flux_filename;
-                                getline(line, adjoint_flux_filename, ' ');
-                                readAdjointFlux(adjoint_flux_filename);
                             }
                             break;
                         }

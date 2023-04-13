@@ -15,7 +15,6 @@ class Cell {
         int groups;
         Material *mat;
         std::vector<double> TLtally;
-        std::vector<double> adjoint_flux;
         double volume;
 
     public:
@@ -24,8 +23,8 @@ class Cell {
 
     }
 
-    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, int groups, Material *mat, std::vector<double> adjoint_flux, double volume = 0):name(name),
-        surfaces(surfs), senses(senses), groups(groups), mat(mat), TLtally(groups, 0), adjoint_flux(adjoint_flux), volume(volume) {
+    Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, int groups, Material *mat, double volume = 0):name(name),
+        surfaces(surfs), senses(senses), groups(groups), mat(mat), TLtally(groups, 0), volume(volume) {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
@@ -59,6 +58,10 @@ class Cell {
 
     std::string getName() {
         return name;
+    }
+
+    double getVelocity(int group) {
+        return mat->getVelocity(group);
     }
 
     double getNu(int group) {
@@ -136,9 +139,6 @@ class Cell {
         return volume;
     }
 
-    double getAdjointFlux(double g) {
-        return adjoint_flux[g];
-    }
 
 };
 
