@@ -5,21 +5,27 @@
 
 class Material {
     private:
-        int groups;
+        int energy_groups;
+        int delayed_groups;
         std::vector<double> totalXS;
         std::vector<double> scatterXS;
         std::vector<std::vector<double>> scatterMatrixXS;
         std::vector<double> captureXS;
         std::vector<double> censusXS;
         std::vector<double> fissionXS;
+        std::vector<double> velo;
         std::vector<double> nu;
         std::vector<double> beta;
+        double totalBeta;
         std::vector<double> decayConst;
     public:
-        Material(int groups, std::vector<double> totalXS, std::vector<double> scatterXS, std::vector<std::vector<double>> scatterMatrixXS, std::vector<double> captureXS, std::vector<double> censusXS,
-                 std::vector<double> fissionXS, std::vector<double> nu, std::vector<double> beta, std::vector<double> decayConst):groups(groups), totalXS(totalXS), 
-            scatterXS(scatterXS), scatterMatrixXS(scatterMatrixXS), captureXS(captureXS), censusXS(censusXS), fissionXS(fissionXS), nu(nu), beta(beta), decayConst(decayConst){
-
+        Material(int e_groups, int del_groups, std::vector<double> totalXS, std::vector<double> scatterXS, std::vector<std::vector<double>> scatterMatrixXS, std::vector<double> captureXS, std::vector<double> censusXS,
+                 std::vector<double> fissionXS, std::vector<double> velo, std::vector<double> nu, std::vector<double> beta, std::vector<double> decayConst):energy_groups(e_groups), delayed_groups(del_groups), totalXS(totalXS), 
+            scatterXS(scatterXS), scatterMatrixXS(scatterMatrixXS), captureXS(captureXS), censusXS(censusXS), fissionXS(fissionXS), velo(velo), nu(nu), beta(beta), decayConst(decayConst){
+            totalBeta = 0;
+            for (double group_beta : beta) {
+                totalBeta += group_beta;
+            }
         }
 
         double getTotalXS(int group) {
@@ -43,11 +49,24 @@ class Material {
         double getNu(int group) {
             return nu[group];
         }
+        double getBeta() {
+            return totalBeta;
+        }
         double getBeta(int group) {
             return beta[group];
         }
         double getDecayConst(int group) {
             return decayConst[group];
+        }
+        int sampleDelayedGroup(Rand &rng) {
+            double ksi = rng.getRand();
+            double accumulator = 0;
+            for(int g = 0; g < delayed_groups; g++) {
+                accumulator += beta[g] / totalBeta;
+                if (accumulator > ksi) {
+                    return g;
+                }
+            }
         }
 
 };

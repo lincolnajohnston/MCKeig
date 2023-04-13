@@ -153,11 +153,6 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             }
             
         }
-        double beta_eff;
-        double lambda_eff;
-        geo->getAverageBetaAndLambda(beta_eff, lambda_eff);
-        std::cout << "Beta-eff: " << beta_eff << std::endl;
-        std::cout << "Lambda-eff: " << lambda_eff << std::endl;
 
         geo->clearTallies();
 

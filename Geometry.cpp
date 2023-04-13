@@ -29,7 +29,6 @@ class Geometry {
         void clearTallies() {
             for (Cell *cell:cells) {
                 cell->clearTL();
-                cell->resetBetas();
             }
         }
 
@@ -47,17 +46,6 @@ class Geometry {
                     std::cout << cell->getName() << " group " << g << ": " << cell->getTLTally(g)/cell->getVolume() << std::endl;
                 }
             }
-        }
-
-        void getAverageBetaAndLambda(double &beta_eff, double &lambda_eff) {
-            double adjoint_flux_total = 0;
-            double adjoint_beta_total = 0;
-            double adjoint_lambda_total = 0;
-            for (Cell *cell:cells) {
-                cell->addBetaTallies(adjoint_flux_total, adjoint_beta_total, adjoint_lambda_total);
-            }
-            beta_eff = adjoint_beta_total / adjoint_flux_total;
-            lambda_eff = adjoint_lambda_total / adjoint_flux_total;
         }
 
         int getGroups() {

@@ -46,7 +46,7 @@ class Particle {
 
     void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, double &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
-        double collision_dist = currentCell->distToNextCollision(group);
+        double collision_dist = currentCell->distToNextCollision(rng, group);
 
         double move_dist = edge_dist + epsilon;
         if (collision_dist < move_dist) {
@@ -87,25 +87,26 @@ class Particle {
                     // analog case
                     direction.isotropicScatter(rng);
                     double ksi = rng.getRand();
-                    if (ksi < currentCell->getBeta(group)) { // delayed neutron
+                    if (ksi < currentCell->getBeta()) { // delayed neutron
+                        int del_group = currentCell->sampleDelayedGroup(rng);
                         std::shared_ptr<Particle> fission_source_del_neut = std::make_shared<Particle>(*this);
-                        fission_source_del_neut->f3WeightAdjust(timestep,1); // hardcode group 1 as delayed neutron group
+                        fission_source_del_neut->f3WeightAdjust(timestep,del_group); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
 
                         std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
-                        time_bank_del_neut->f2WeightAdjust(timestep, 1); // hardcode group 1 as delayed neutron group
+                        time_bank_del_neut->f2WeightAdjust(timestep, del_group); // hardcode group 1 as delayed neutron group
                         time_bank_del_neut->sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         delayed_neutron_bank.push_back(time_bank_del_neut);
 
-                        currentCell->tallyBeta(1, delayed_group); // tally that delayed fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
+                        // tally that delayed fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     else { // prompt neutron
                         std::shared_ptr<Particle> prompt_neut = std::make_shared<Particle>(*this);
                         prompt_neut->samplePromptNeutronEnergy();
                         generated_neutron_bank.push_back(prompt_neut);
-                        currentCell->tallyBeta(0, prompt_group); // tally that prompt fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
+                        // tally that prompt fission took place with adjoint weighting, will need to update this when neutron group sampling is more complicated
                     }
                     
                     source_particles += this->getWeight();

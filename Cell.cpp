@@ -17,9 +17,6 @@ class Cell {
         std::vector<double> TLtally;
         std::vector<double> adjoint_flux;
         double volume;
-        double adjoint_flux_sum;
-        double adjoint_beta_sum;
-        double adjoint_lambda_sum;
 
     public:
 
@@ -32,8 +29,6 @@ class Cell {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
-        adjoint_flux_sum = 0;
-        adjoint_beta_sum = 0;
     }
 
     void addSurface(Surface  *surf, double sense) {
@@ -70,16 +65,24 @@ class Cell {
         return mat->getNu(group);
     }
 
-    double getBeta(int group) {
-        return mat->getBeta(group);
+    double getBeta() {
+        return mat->getBeta();
     }
 
-    double getDecayConst(int group) {
-        return mat->getDecayConst(group);
+    double getBeta(int del_group) {
+        return mat->getBeta(del_group);
     }
 
-    double distToNextCollision(int group) {
-        double rand_val = ((double)rand())/(double)RAND_MAX;
+    double getDecayConst(int del_group) {
+        return mat->getDecayConst(del_group);
+    }
+
+    int sampleDelayedGroup(Rand &rng) {
+        return mat->sampleDelayedGroup(rng);
+    }
+
+    double distToNextCollision(Rand &rng, int group) {
+        double rand_val = rng.getRand();
         return -1 * log(rand_val)/mat->getTotalXS(group);
     }
 
@@ -135,24 +138,6 @@ class Cell {
 
     double getAdjointFlux(double g) {
         return adjoint_flux[g];
-    }
-
-    void tallyBeta(double beta_tally, double g) {
-        adjoint_flux_sum += adjoint_flux[g];
-        adjoint_beta_sum += beta_tally * adjoint_flux[g];
-        adjoint_lambda_sum += getDecayConst(g) * adjoint_flux[g];
-    }
-
-    void resetBetas() {
-        adjoint_flux_sum = 0;
-        adjoint_beta_sum = 0;
-        adjoint_lambda_sum = 0;
-    }
-
-    void addBetaTallies(double &adjoint_flux_outer_sum, double &adjoint_beta_outer_sum, double &adjoint_lambda_outer_sum) {
-        adjoint_flux_outer_sum += adjoint_flux_sum;
-        adjoint_beta_outer_sum += adjoint_beta_sum;
-        adjoint_lambda_outer_sum += adjoint_lambda_sum;
     }
 
 };
