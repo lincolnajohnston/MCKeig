@@ -47,7 +47,7 @@ class Particle {
         weight = weight * factor;
     }
 
-    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, double &source_particles, double timestep, Rand& rng) {
+    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, bool isActive, double &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision(rng, group);
 
@@ -71,7 +71,9 @@ class Particle {
                 alive = false;
             }
             else if (collision_name == "census") {
-                delayed_neutron_bank.push_back(std::make_shared<Particle>(*this));
+                if (isActive) {
+                    delayed_neutron_bank.push_back(std::make_shared<Particle>(*this));
+                }
 
                 source_particles += this->getWeight();
                 alive = false;
@@ -93,12 +95,13 @@ class Particle {
                         fission_source_del_neut->f3WeightAdjust(timestep,del_group); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
 
-                        std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
-                        time_bank_del_neut->f2WeightAdjust(timestep, del_group); // hardcode group 1 as delayed neutron group
-                        time_bank_del_neut->sampleDelayedNeutronEnergy();
-
                         generated_neutron_bank.push_back(fission_source_del_neut);
-                        delayed_neutron_bank.push_back(time_bank_del_neut);
+                        if (isActive) {
+                            std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
+                            time_bank_del_neut->f2WeightAdjust(timestep, del_group); // hardcode group 1 as delayed neutron group
+                            time_bank_del_neut->sampleDelayedNeutronEnergy();
+                            delayed_neutron_bank.push_back(time_bank_del_neut);
+                        }
 
                     }
                     else { // prompt neutron
