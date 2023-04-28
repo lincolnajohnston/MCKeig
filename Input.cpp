@@ -193,7 +193,6 @@ class Input {
         int input_phase = 0;
         if ( myfile.is_open() ) {
             while(std::getline(myfile, file_string)) {
-                std::cout << "line: " << file_string << std::endl;
                 if (file_string.rfind("%", 0) == 0) {
                     continue;
                 }
@@ -218,13 +217,10 @@ class Input {
                 switch (input_phase) {
                     case 0:
                         {
-                            std::cout << "phase 0" << std::endl;
                             break;
                         }
                     case 1:
                         {
-                            std::cout << "Simulation phase" << std::endl;
-                            std::cout << file_string << std::endl;
                             std::stringstream line(file_string);
                             std::string identifier;
                             getline(line, identifier, ' ');
@@ -241,25 +237,21 @@ class Input {
                         }
                     case 2:
                         {
-                            std::cout << "Materials phase" << std::endl;
                             readMaterial(file_string);
                             break;
                         }
                     case 3:
                         {
-                            std::cout << "Surfaces phase" << std::endl;
                             readSurface(file_string);
                             break;
                         }
                     case 4:
                         {
-                            std::cout << "Cells Phase" << std::endl;
                             readCell(file_string);
                             break;
                         }
                     case 5:
                         {
-                            std::cout << "Tallies Phase" << std::endl;
                             // TODO: implement different types of tallies and method of tracking/displaying them
                             break;
                         }

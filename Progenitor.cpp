@@ -8,8 +8,8 @@
 class Progenitor {
     protected:
         double weight;
-        double travel_time;
-        int delayed_group;
+        double travel_time; // travel time before fissioning
+        int delayed_group; // delayed group progenitor created when it fissioned (-1 if prompt)
         std::shared_ptr<Progenitor> prog;
 
     public:

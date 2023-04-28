@@ -18,9 +18,9 @@ class Particle {
         Cell *currentCell;
         double epsilon = pow(10,-10);
         double weight;
-        int group;
-        int delayed_group;
-        int prompt_group;
+        int group; // current particle energy group
+        int delayed_group; // energy group that delayed neutrons go to
+        int prompt_group; // energy group that prompt neutrons go to
         double travel_time;
         std::shared_ptr<Progenitor> prog;
 
@@ -145,8 +145,14 @@ class Particle {
     }
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
-    void f1WeightAdjust(double timestep, int delayed_group) {
-        multiplyWeight(exp(-1 * currentCell->getDecayConst(delayed_group) * timestep));
+    void f1WeightAdjust(double timestep) {
+        int del_group = prog->getDelayedGroup();
+        if (del_group < 0) {
+            multiplyWeight(0); // if particle in transient bank came from prompt fission (census), then don't propagate forward in time
+        }
+        else {
+            multiplyWeight(exp(-1 * currentCell->getDecayConst(del_group) * timestep));
+        }
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the next time step
@@ -191,7 +197,7 @@ class Particle {
             temp_prog = prog->getProg();
         }
 
-        if (temp_prog->getDelayedGroup() >= 0) {
+        if (temp_prog->getDelayedGroup() == delayed_group) {
             return weight;
         }
         return 0;

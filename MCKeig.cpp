@@ -87,15 +87,15 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
     for (double t = 0; t < deltaT * 100; t=t + deltaT) {
         double k_eig_sum = 0;
         double lifetime_sum = 0;
-        double beta_eff_sum = 0;
+        std::vector<double> beta_eff_sum = {0,0,0,0,0,0};
         int adjoint_weighted_cycles = 0;
 
         double inactive_weight = sumBankWeights(part_bank);
 
         // fission source iteration
         for (size_t cycle = 0; cycle < cycles; cycle++) {
-            //std::cout << "--------------Cycle " << cycle << "-----------" << std::endl;
-            //std::cout << "Num Neutrons: " << part_bank.size() << std::endl;
+            std::cout << "--------------Cycle " << cycle << "-----------" << std::endl;
+            std::cout << "Num Neutrons: " << part_bank.size() << std::endl;
             std::vector<std::shared_ptr<Particle>> fission_source_bank; // neutrons that will be used in the next fission source iteration
             double source_particles = 0;
 
@@ -119,7 +119,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             if (cycle >= inactive_cycles) {
                 k_eig_sum += k;
             }
-            //std::cout << "k = " << k << " for cycle " << cycle << std::endl;
+            std::cout << "k = " << k << " for cycle " << cycle << std::endl;
 
             // TODO: adjust particles' weights by k to maintain weight, then do splitting/routletting if necessary
             double weight_adjustment = initial_particles / sumBankWeights(fission_source_bank);
@@ -138,15 +138,19 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
             // calculate "adjoint weighted" lifetime for 10 generations back
             if (cycle > inactive_cycles + 10) {
                 double lifetimeTotal = 0;
-                double betaTotal = 0;
+                std::vector<double> betaTotals = {0,0,0,0,0,0};
                 for (std::shared_ptr<Particle> p:part_bank) {
                     lifetimeTotal += p->getLifetimeContribution(10);
-                    betaTotal += p->getBetaContribution(1, 10);
+                    for (int del_group = 0; del_group < 6; del_group++) {
+                        betaTotals[del_group] += p->getBetaContribution(del_group, 10);
+                    }
                 }
                 //std::cout << "Effective Lifetime: " << lifetimeTotal / total_fission_source_weight << std::endl;
                 //std::cout << "Beta Effective: " << betaTotal / total_fission_source_weight << std::endl;
                 lifetime_sum += lifetimeTotal / total_fission_source_weight;
-                beta_eff_sum += betaTotal / total_fission_source_weight;
+                for (int del_group = 0; del_group < 6; del_group++) {
+                    beta_eff_sum[del_group] += betaTotals[del_group] / total_fission_source_weight;
+                }
                 adjoint_weighted_cycles++;
             }
 
@@ -169,15 +173,17 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
         // adjust weights of delayed neutrons for next time step (term 3 in Evan's dissertation TFS equation)
         for (std::shared_ptr<Particle> p:new_delayed_neutron_bank) {
-            p->f1WeightAdjust(deltaT, 1); // hardcode group 1 as delayed neutron group, using 1 group delayed neutrons, use 6 in future
+            p->f1WeightAdjust(deltaT); // hardcode group 1 as delayed neutron group, using 1 group delayed neutrons, use 6 in future
         }
         
 
         // Comb delayed neutron bank (keep size of delayed neutron vector under max value)
         double total_bank_weight = sumBankWeights(delayed_neutron_bank);
-        //std::cout << "Delayed bank total weight: " << total_bank_weight << std::endl;
-        std::cout << total_bank_weight << std::endl;
+        std::cout << "Delayed bank total weight: " << total_bank_weight << std::endl;
+        weightWindows(delayed_neutron_bank, 0.01, 10, 1, rng);
         comb(delayed_neutron_bank, delayed_bank_max_size);
+        total_bank_weight = sumBankWeights(delayed_neutron_bank);
+        std::cout << "Delayed bank total weight: " << total_bank_weight << std::endl;
 
         // Weight windows: low-weight neutrons in delayed neutron bank
         // weightWindows(delayed_neutron_bank, 0.01, 10, 1, rng);
@@ -185,11 +191,16 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
         // Print results for this time step
         double avg_k_eig = k_eig_sum / (cycles - inactive_cycles);
         double avg_lifetime = lifetime_sum / adjoint_weighted_cycles;
-        double avg_beta_eff = beta_eff_sum / adjoint_weighted_cycles;
-        //std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
-        //std::cout << "Average lifetime from last " << adjoint_weighted_cycles << " active cycles: " << avg_lifetime << std::endl;
-        //std::cout << "Average beta-eff from last " << adjoint_weighted_cycles << " active cycles: " << avg_beta_eff << std::endl;
-        //std::cout << "Total particles: " << part_bank.size() << std::endl;
+        std::vector<double> avg_beta_eff = {0,0,0,0,0,0};
+        for (int del_group = 0; del_group < 6; del_group++) {
+            avg_beta_eff[del_group] = beta_eff_sum[del_group] / adjoint_weighted_cycles;
+        }
+        std::cout << "Average k-eig from last " << cycles - inactive_cycles << " active cycles: " << avg_k_eig << std::endl;
+        std::cout << "Average lifetime from last " << adjoint_weighted_cycles << " active cycles: " << avg_lifetime << std::endl;
+        for (int del_group = 0; del_group < 6; del_group++) {
+            std::cout << "Average beta-eff (group " << del_group << ") from last " << adjoint_weighted_cycles << " active cycles: " << avg_beta_eff[del_group] << std::endl;
+        }
+        std::cout << "Total particles: " << part_bank.size() << std::endl;
     }
 }
 
@@ -205,7 +216,7 @@ int main(int argc, char *argv[]) {
         input_file = argv[2];
     }
 
-    double deltaT = 1;
+    double deltaT = 100;
 
     Input input(input_file);
     Geometry *inputTestGeo = input.getGeometry();
