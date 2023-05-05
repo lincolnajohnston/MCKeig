@@ -5,6 +5,7 @@
 #include "Surface.cpp"
 #include "Rand.cpp"
 #include "Material.cpp"
+#include <tuple>
 
 class Cell {
     protected:
@@ -15,7 +16,15 @@ class Cell {
         int groups;
         Material *mat;
         std::vector<double> TLtally;
+        std::vector<double> adjoint_flux;
         double volume;
+
+        std::vector<double> beta_sums;
+        double fission_sum;
+
+        //temporary vectors used in the creation of adjoint flux
+        std::vector<double> adjoint_weighted_fission_source;
+        std::vector<double> fission_source;
 
     public:
 
@@ -24,7 +33,8 @@ class Cell {
     }
 
     Cell(std::string name, std::vector<Surface *> surfs, std::vector<bool> senses, int groups, Material *mat, double volume = 0):name(name),
-        surfaces(surfs), senses(senses), groups(groups), mat(mat), TLtally(groups, 0), volume(volume) {
+        surfaces(surfs), senses(senses), groups(groups), mat(mat), TLtally(groups, 0), adjoint_flux(groups, 0),volume(volume), 
+        beta_sums(mat->getNumDelayedGroups(), 0), fission_sum(0), adjoint_weighted_fission_source(groups, 0), fission_source(groups, 0) {
         if (surfs.size() != senses.size()) {
             std::cout << "Error: Senses not defined for each surface" << std::endl;
         }
@@ -135,8 +145,40 @@ class Cell {
         }
     }
 
+    // record every time fission takes place, tally if it was a delayed neutron, weighted by importance
+    void tallyBeta(double weight, int del_group, int E_group) { // energy group of outgoing neutron after fission used for importance
+        if (del_group >= 0) {
+            beta_sums[del_group] += weight * adjoint_flux[E_group];
+        }
+        fission_sum += weight * adjoint_flux[E_group];
+    }
+
     double getVolume() {
         return volume;
+    }
+
+    void tallyAdjointFlux(double weight, double current_E_group, int prog_E_group) {
+        adjoint_weighted_fission_source[prog_E_group] += weight;
+        fission_source[current_E_group] += weight;
+    }
+
+    void createAdjointFluxSolution() {
+        for(int i = 0; i < adjoint_flux.size(); i++) {
+            if (fission_source[i] == 0) { // if no data collected on importance of flux in this cell at this energy, set adjoint to 1
+                adjoint_flux[i] = 1;
+            }
+            else {
+                adjoint_flux[i] = adjoint_weighted_fission_source[i] / fission_source[i];
+            }
+        }
+    }
+
+    double getAdjointFlux(int energy_group) {
+        return adjoint_weighted_fission_source[energy_group];
+    }
+
+    std::tuple<std::vector<double>, double> getBetaEff() {
+        return std::make_tuple(beta_sums, fission_sum);
     }
 
 

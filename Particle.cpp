@@ -19,6 +19,8 @@ class Particle {
         double epsilon = pow(10,-10);
         double weight;
         int group; // current particle energy group
+        int origin_group; // energy group particle was born in
+        int cur_del_group; // delayed group that this neutron came from (-1 if from prompt fission)
         int delayed_group; // energy group that delayed neutrons go to
         int prompt_group; // energy group that prompt neutrons go to
         double travel_time;
@@ -26,11 +28,13 @@ class Particle {
 
     public:
 
-    Particle(Position location, Direction direction, Geometry *geo, double weight = 1, int group = 0):location(location), direction(direction),
-         geo(geo), weight(weight), group(group), delayed_group(1), prompt_group(0) {
+    Particle(Position location, Direction direction, Geometry *geo, double weight = 1, int group = 0, double cur_del_group = -1):location(location), direction(direction),
+         geo(geo), weight(weight), group(group), cur_del_group(cur_del_group), delayed_group(1), prompt_group(0) {
         currentCell = geo->cellAtLocation(location);
+        origin_group = group;
         alive = true;
     }
+
     Position getLocation() {
         return location;
     }
@@ -43,11 +47,16 @@ class Particle {
         weight = newWeight;
     }
 
+    void setOriginGroup(int g) {
+        origin_group = g;
+    }
+
     void multiplyWeight(double factor) {
         weight = weight * factor;
     }
 
-    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, bool isActive, double &source_particles, double timestep, Rand& rng) {
+    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, bool isActive, 
+        bool steady_state, double &source_particles, double timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision(rng, group);
 
@@ -89,26 +98,35 @@ class Particle {
                     direction.isotropicScatter(rng);
                     double ksi = rng.getRand();
                     if (ksi < currentCell->getBeta()) { // delayed neutron
-                        int del_group = currentCell->sampleDelayedGroup(rng);
-                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, del_group, current_prog);
+                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, origin_group, currentCell, current_prog);
+                        cur_del_group = currentCell->sampleDelayedGroup(rng); // delayed group sampled for this fission
                         std::shared_ptr<Particle> fission_source_del_neut = std::make_shared<Particle>(*this);
-                        fission_source_del_neut->f3WeightAdjust(timestep,del_group); // hardcode group 1 as delayed neutron group
+                        fission_source_del_neut->f3WeightAdjust(timestep, cur_del_group); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         if (isActive) {
                             std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
-                            time_bank_del_neut->f2WeightAdjust(timestep, del_group); // hardcode group 1 as delayed neutron group
+                            time_bank_del_neut->f2WeightAdjust(timestep, cur_del_group); // hardcode group 1 as delayed neutron group
                             time_bank_del_neut->sampleDelayedNeutronEnergy();
                             delayed_neutron_bank.push_back(time_bank_del_neut);
+
+                            if (!steady_state) {
+                                currentCell->tallyBeta(weight, cur_del_group, delayed_group);
+                            }
                         }
 
                     }
                     else { // prompt neutron
-                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, -1, current_prog);
+                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, origin_group, currentCell, current_prog);
+                        cur_del_group = -1;
                         std::shared_ptr<Particle> prompt_neut = std::make_shared<Particle>(*this);
                         prompt_neut->samplePromptNeutronEnergy();
                         generated_neutron_bank.push_back(prompt_neut);
+
+                        if(isActive && !steady_state) {
+                            currentCell->tallyBeta(weight, -1, prompt_group);
+                        }
                     }
                     
                     source_particles += this->getWeight();
@@ -146,12 +164,11 @@ class Particle {
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
     void f1WeightAdjust(double timestep) {
-        int del_group = prog->getDelayedGroup();
-        if (del_group < 0) {
+        if (cur_del_group < 0) {
             multiplyWeight(0); // if particle in transient bank came from prompt fission (census), then don't propagate forward in time
         }
         else {
-            multiplyWeight(exp(-1 * currentCell->getDecayConst(del_group) * timestep));
+            multiplyWeight(exp(-1 * currentCell->getDecayConst(cur_del_group) * timestep));
         }
     }
 
@@ -171,16 +188,18 @@ class Particle {
         return alive;
     }
 
-    // sample an energy group for this particle if it originates from a delayed neutron event
+    // sample an energy group for this particle if it originates from a delayed neutron fission event
     void sampleDelayedNeutronEnergy() {
         // TODO: More accurately sample energy group when there are more than 2 groups
         group = delayed_group;
+        origin_group = delayed_group;
     }
 
     // sample an energy group for this particle if it originates from a prompt fission
     void samplePromptNeutronEnergy() {
         // TODO: More accurately sample energy group when there are more than 2 groups
         group = prompt_group;
+        origin_group = prompt_group;
     }
 
     double getLifetimeContribution(int generations_back) {
@@ -191,16 +210,14 @@ class Particle {
         return weight * temp_prog->getTravelTime();
     }
 
-    double getBetaContribution(int delayed_group, int generations_back) {
+    // used for getting adjoint flux in steady state simulation
+    void tallyCellAdjoint(int generations_back) {
         std::shared_ptr<Progenitor> temp_prog = prog;
         for (int i = 0; i < generations_back - 1; i++) {
             temp_prog = prog->getProg();
         }
 
-        if (temp_prog->getDelayedGroup() == delayed_group) {
-            return weight;
-        }
-        return 0;
+        temp_prog->getCell()->tallyAdjointFlux(weight, group, temp_prog->getEnergyGroup());
     }
 
 };

@@ -61,6 +61,9 @@ class Material {
         double getDecayConst(int group) {
             return decayConst[group];
         }
+        double getNumDelayedGroups() {
+            return delayed_groups;
+        }
         int sampleDelayedGroup(Rand &rng) {
             double ksi = rng.getRand();
             double accumulator = 0;

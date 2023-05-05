@@ -1,0 +1,12 @@
+2										<energy groups>
+6										<delayed neutron groups>
+20.0 80.0									<total xs>
+17 40										<scatter xs>
+2.75 2 									<capture xs>
+0.25 38									<fission xs>
+1.4E6 1.4E4 								<velocities>
+2 2										<nu>
+0.000215 0.001424 0.001274 0.002568 0.000748 0.000273		<beta>
+0.0124 0.0305 0.111 0.301 1.14 3.01					<decay_const>
+14 3										<scatter matrix>
+0 40
