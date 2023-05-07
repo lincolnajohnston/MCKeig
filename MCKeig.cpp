@@ -75,10 +75,12 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
     // create bank for initial guess of fission source, B*psi_n
     std::vector<std::shared_ptr<Particle>> part_bank;
+    std::vector<std::shared_ptr<Particle>> PK_bank;
     Position initial_pos = {0,0,0};
     Direction initial_dir = Direction(1,0,0);
     for(size_t i = 0; i < initial_particles; i++) {
         part_bank.push_back(std::make_shared<Particle>(initial_pos, initial_dir, geo));
+        PK_bank.push_back(std::make_shared<Particle>(initial_pos, initial_dir, geo));
     }
     std::vector<std::shared_ptr<Particle>> delayed_neutron_bank; // delayed neutron source from the last time step, C*psi_(n-1)
     std::vector<std::shared_ptr<Particle>> new_delayed_neutron_bank; // delayed neutron source created the last time step, C*psi_(n-1)
@@ -91,6 +93,73 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
         int adjoint_weighted_cycles = 0;
 
         double inactive_weight = sumBankWeights(part_bank);
+
+        //calculate beta-eff
+        for (size_t cycle = 0; cycle < cycles; cycle++) {
+            std::cout << "--------------Cycle " << cycle << "-----------" << std::endl;
+            std::cout << "Num Neutrons: " << PK_bank.size() << std::endl;
+            std::vector<std::shared_ptr<Particle>> fission_source_bank; // neutrons that will be used in the next fission source iteration
+            double source_particles = 0;
+
+            // run particles in current fission source step, add generated neutrons to banks for either next fission source step or time step
+            for (size_t i = 0; i < PK_bank.size(); i++) {
+                std::shared_ptr<Particle> p = PK_bank[i];
+                while(p->isAlive()) {
+                    p->move(fission_source_bank, fission_source_bank, cycle >= inactive_cycles, source_particles, deltaT, rng);
+                }
+            }
+
+            //std::cout << "Source particles: " << source_particles << std::endl;
+            //std::cout << "Delayed neutrons in bank: " << delayed_neutron_bank.size() << std::endl;
+            /*double k = 1.0 * source_particles / sumBankWeights(PK_bank);
+            if (cycle >= inactive_cycles) {
+                k_eig_sum += k;
+            }
+            std::cout << "k = " << k << " for cycle " << cycle << std::endl;*/
+
+            // TODO: adjust particles' weights by k to maintain weight, then do splitting/routletting if necessary
+            double weight_adjustment = initial_particles / sumBankWeights(fission_source_bank);
+            PK_bank = fission_source_bank; // set new fission source iteration bank
+
+            // renormalize fission source bank weight
+            for (std::shared_ptr<Particle> p:PK_bank) {
+                p->multiplyWeight(weight_adjustment);
+            }
+
+            comb(PK_bank, initial_particles);
+
+            double total_fission_source_weight = sumBankWeights(PK_bank);
+            //std::cout << "part_bank weight: " << total_fission_source_weight << "\n" << std::endl;
+
+            // calculate "adjoint weighted" lifetime for 10 generations back
+            if (cycle > inactive_cycles + 10) {
+                double lifetimeTotal = 0;
+                std::vector<double> betaTotals = {0,0,0,0,0,0};
+                for (std::shared_ptr<Particle> p:PK_bank) {
+                    lifetimeTotal += p->getLifetimeContribution(10);
+                    for (int del_group = 0; del_group < 6; del_group++) {
+                        betaTotals[del_group] += p->getBetaContribution(del_group, 10);
+                    }
+                }
+                //std::cout << "Effective Lifetime: " << lifetimeTotal / total_fission_source_weight << std::endl;
+                //std::cout << "Beta Effective: " << betaTotal / total_fission_source_weight << std::endl;
+                lifetime_sum += lifetimeTotal / total_fission_source_weight;
+                for (int del_group = 0; del_group < 6; del_group++) {
+                    beta_eff_sum[del_group] += betaTotals[del_group] / total_fission_source_weight;
+                }
+                adjoint_weighted_cycles++;
+            }
+
+            // print and clear tallies
+            if (cycle == cycles - 1) {
+                //geo->printFluxes();
+            }
+            if (cycle == inactive_cycles - 1) {
+                geo->clearTallies();
+            }
+            
+        }
+        geo->clearTallies();
 
         // fission source iteration
         for (size_t cycle = 0; cycle < cycles; cycle++) {
@@ -134,25 +203,6 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
             double total_fission_source_weight = sumBankWeights(part_bank);
             //std::cout << "part_bank weight: " << total_fission_source_weight << "\n" << std::endl;
-
-            // calculate "adjoint weighted" lifetime for 10 generations back
-            if (cycle > inactive_cycles + 10) {
-                double lifetimeTotal = 0;
-                std::vector<double> betaTotals = {0,0,0,0,0,0};
-                for (std::shared_ptr<Particle> p:part_bank) {
-                    lifetimeTotal += p->getLifetimeContribution(10);
-                    for (int del_group = 0; del_group < 6; del_group++) {
-                        betaTotals[del_group] += p->getBetaContribution(del_group, 10);
-                    }
-                }
-                //std::cout << "Effective Lifetime: " << lifetimeTotal / total_fission_source_weight << std::endl;
-                //std::cout << "Beta Effective: " << betaTotal / total_fission_source_weight << std::endl;
-                lifetime_sum += lifetimeTotal / total_fission_source_weight;
-                for (int del_group = 0; del_group < 6; del_group++) {
-                    beta_eff_sum[del_group] += betaTotals[del_group] / total_fission_source_weight;
-                }
-                adjoint_weighted_cycles++;
-            }
 
             // print and clear tallies
             if (cycle == cycles - 1) {
