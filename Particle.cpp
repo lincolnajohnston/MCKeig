@@ -47,7 +47,7 @@ class Particle {
         weight = weight * factor;
     }
 
-    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, bool isActive, double &source_particles, double timestep, Rand& rng) {
+    void move(std::vector<std::shared_ptr<Particle>> &generated_neutron_bank, std::vector<std::shared_ptr<Particle>> &delayed_neutron_bank, bool isActive, double &source_particles, double dt, int timestep, Rand& rng) {
         double edge_dist = currentCell->distToEdge(location, direction);
         double collision_dist = currentCell->distToNextCollision(rng, group);
 
@@ -90,22 +90,26 @@ class Particle {
                     double ksi = rng.getRand();
                     if (ksi < currentCell->getBeta()) { // delayed neutron
                         int del_group = currentCell->sampleDelayedGroup(rng);
-                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, del_group, current_prog);
+                        if (isActive) {
+                            prog = std::make_shared<Progenitor>(weight, progeny_travel_time, del_group, timestep, current_prog);
+                        }
                         std::shared_ptr<Particle> fission_source_del_neut = std::make_shared<Particle>(*this);
-                        fission_source_del_neut->f3WeightAdjust(timestep,del_group); // hardcode group 1 as delayed neutron group
+                        fission_source_del_neut->f3WeightAdjust(dt,del_group); // hardcode group 1 as delayed neutron group
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         if (isActive) {
                             std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
-                            time_bank_del_neut->f2WeightAdjust(timestep, del_group); // hardcode group 1 as delayed neutron group
+                            time_bank_del_neut->f2WeightAdjust(dt, del_group); // hardcode group 1 as delayed neutron group
                             time_bank_del_neut->sampleDelayedNeutronEnergy();
                             delayed_neutron_bank.push_back(time_bank_del_neut);
                         }
 
                     }
                     else { // prompt neutron
-                        prog = std::make_shared<Progenitor>(weight, progeny_travel_time, -1, current_prog);
+                        if (isActive) {
+                            prog = std::make_shared<Progenitor>(weight, progeny_travel_time, -1, timestep, current_prog);
+                        }
                         std::shared_ptr<Particle> prompt_neut = std::make_shared<Particle>(*this);
                         prompt_neut->samplePromptNeutronEnergy();
                         generated_neutron_bank.push_back(prompt_neut);
@@ -145,26 +149,26 @@ class Particle {
     }
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
-    void f1WeightAdjust(double timestep) {
+    void f1WeightAdjust(double dt) {
         int del_group = prog->getDelayedGroup();
         if (del_group < 0) {
             multiplyWeight(0); // if particle in transient bank came from prompt fission (census), then don't propagate forward in time
         }
         else {
-            multiplyWeight(exp(-1 * currentCell->getDecayConst(del_group) * timestep));
+            multiplyWeight(exp(-1 * currentCell->getDecayConst(del_group) * dt));
         }
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the next time step
-    void f2WeightAdjust(double timestep, int delayed_group) {
+    void f2WeightAdjust(double dt, int delayed_group) {
         double lambda = currentCell->getDecayConst(delayed_group);
-        multiplyWeight((1 - exp(-1 * lambda * timestep) - lambda * timestep * exp(-1 * lambda * timestep)) / (lambda * timestep));
+        multiplyWeight((1 - exp(-1 * lambda * dt) - lambda * dt * exp(-1 * lambda * dt)) / (lambda * dt));
     }
 
     // adjust weight by probability of precursor decaying within this time step and being being considered as a delayed neutron for the current fission source iteration
-    void f3WeightAdjust(double timestep, int delayed_group) {
+    void f3WeightAdjust(double dt, int delayed_group) {
         double lambda = currentCell->getDecayConst(delayed_group);
-        multiplyWeight(exp(-1 * lambda * timestep) * (1 - exp(lambda * timestep) + lambda * timestep * exp(lambda * timestep)) / (lambda * timestep));
+        multiplyWeight(exp(-1 * lambda * dt) * (1 - exp(lambda * dt) + lambda * dt * exp(lambda * dt)) / (lambda * dt));
     }
 
     bool isAlive() {
@@ -191,16 +195,18 @@ class Particle {
         return weight * temp_prog->getTravelTime();
     }
 
-    double getBetaContribution(int delayed_group, int generations_back) {
+    void getBetaContribution(int delayed_group, int generations_back, std::vector<std::vector<double>> &beta_counts) {
         std::shared_ptr<Progenitor> temp_prog = prog;
         for (int i = 0; i < generations_back - 1; i++) {
             temp_prog = prog->getProg();
+            if (!temp_prog) { // make sure progenitor exists
+                return;
+            }
         }
 
         if (temp_prog->getDelayedGroup() == delayed_group) {
-            return weight;
+            beta_counts[temp_prog->getTimestep()][delayed_group] += weight;
         }
-        return 0;
     }
 
 };
