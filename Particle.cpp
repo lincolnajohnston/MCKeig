@@ -61,6 +61,7 @@ class Particle {
             location.z += move_dist * direction.getK();
 
             currentCell->tallyTL(move_dist, weight, group);
+            source_particles += weight * move_dist * currentCell->getNuSigmaF(group);
 
             std::string collision_name = currentCell->sample_collision(rng, group);
             if (collision_name == "scat") {
@@ -74,8 +75,7 @@ class Particle {
                 if (isActive) {
                     delayed_neutron_bank.push_back(std::make_shared<Particle>(*this));
                 }
-
-                source_particles += this->getWeight();
+                //source_particles += weight;
                 alive = false;
             }
             else if (collision_name == "fis") {
@@ -94,15 +94,21 @@ class Particle {
                             prog = std::make_shared<Progenitor>(weight, progeny_travel_time, del_group, timestep, current_prog);
                         }
                         std::shared_ptr<Particle> fission_source_del_neut = std::make_shared<Particle>(*this);
-                        fission_source_del_neut->f3WeightAdjust(dt,del_group); // hardcode group 1 as delayed neutron group
+                        fission_source_del_neut->f3WeightAdjust(dt,del_group);
                         fission_source_del_neut->sampleDelayedNeutronEnergy();
 
                         generated_neutron_bank.push_back(fission_source_del_neut);
                         if (isActive) {
-                            std::shared_ptr<Particle> time_bank_del_neut = std::make_shared<Particle>(*this);
-                            time_bank_del_neut->f2WeightAdjust(dt, del_group); // hardcode group 1 as delayed neutron group
-                            time_bank_del_neut->sampleDelayedNeutronEnergy();
-                            delayed_neutron_bank.push_back(time_bank_del_neut);
+                            // push copy of neutron in fission source bank to delayed neutron bank, with f1 attenuation
+                            std::shared_ptr<Particle> time_bank_del_neut_1 = std::make_shared<Particle>(*fission_source_del_neut);
+                            time_bank_del_neut_1->f1WeightAdjust(dt);
+                            delayed_neutron_bank.push_back(time_bank_del_neut_1);
+
+                            // push portion of neutron weighted to next time step to delayed neutron bank
+                            std::shared_ptr<Particle> time_bank_del_neut_2 = std::make_shared<Particle>(*this);
+                            time_bank_del_neut_2->f2WeightAdjust(dt, del_group);
+                            time_bank_del_neut_2->sampleDelayedNeutronEnergy();
+                            delayed_neutron_bank.push_back(time_bank_del_neut_2);
                         }
 
                     }
@@ -114,8 +120,8 @@ class Particle {
                         prompt_neut->samplePromptNeutronEnergy();
                         generated_neutron_bank.push_back(prompt_neut);
                     }
+                    //source_particles += weight;
                     
-                    source_particles += this->getWeight();
                 }
                 alive = false;
             }
@@ -129,6 +135,7 @@ class Particle {
             location.z += move_dist * direction.getK();
 
             currentCell->tallyTL(move_dist, weight, group);
+            source_particles += weight * move_dist * currentCell->getNuSigmaF(group);
 
             currentCell = geo->cellAtLocation(location);
 
@@ -150,6 +157,10 @@ class Particle {
 
     // adjust weight by factor equal to probability of precursor surviving the length of the time step
     void f1WeightAdjust(double dt) {
+        if (!prog) {
+            multiplyWeight(0);
+            return;
+        }
         int del_group = prog->getDelayedGroup();
         if (del_group < 0) {
             multiplyWeight(0); // if particle in transient bank came from prompt fission (census), then don't propagate forward in time

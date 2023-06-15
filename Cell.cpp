@@ -68,6 +68,10 @@ class Cell {
         return mat->getNu(group);
     }
 
+    double getNuSigmaF(int group) {
+        return mat->getNu(group) * mat->getFissionXS(group);
+    }
+
     double getBeta() {
         return mat->getBeta();
     }

@@ -33,9 +33,10 @@ void weightWindows(std::vector<std::shared_ptr<Particle>> &bank, double lowerWei
         else if (p->getWeight() > upperWeight){
             double num_splits = round(p->getWeight() / survivalWeight);
             p->multiplyWeight(1.0 / num_splits);
-            for(size_t i = 0; i < num_splits; i++) {
-                temp_bank.push_back(p);
+            for(size_t i = 0; i < num_splits-1; i++) {
+                temp_bank.push_back(std::make_shared<Particle>(*p));
             }
+            temp_bank.push_back(p);
         }
         else {
             temp_bank.push_back(p);
@@ -44,6 +45,7 @@ void weightWindows(std::vector<std::shared_ptr<Particle>> &bank, double lowerWei
     bank = temp_bank;
 }
 
+// returns the sum of the weights of the particles in the bank passed in
 double sumBankWeights(std::vector<std::shared_ptr<Particle>> &bank) {
     double sum = 0;
     for (std::shared_ptr<Particle> part : bank) {
@@ -52,6 +54,7 @@ double sumBankWeights(std::vector<std::shared_ptr<Particle>> &bank) {
     return sum;
 }
 
+// reduce the number of particles in particle_bank by removing some particles and increasing the weight of others randomly
 void comb(std::vector<std::shared_ptr<Particle>> &particle_bank, int n_particles) {
     int bank_size = particle_bank.size();
     if (bank_size > n_particles) {
@@ -66,20 +69,22 @@ void comb(std::vector<std::shared_ptr<Particle>> &particle_bank, int n_particles
     }
 }
 
+// Given an input geometry, find the particle flux solution at time intervals deltaT
 void runTransientFixedSource(Geometry *geo, double deltaT) {
     Rand rng;
-    int initial_particles = 10000;
-    int delayed_bank_max_size = 10000;
-    int cycles = 100;
+    int initial_particles = 10000; // number of neutrons at simulation start
+    int delayed_bank_max_size = 10000; // max number of neutrons in delayed bank before combing
+    int cycles = 100; // active + inactive power iteration cycles
     int inactive_cycles = 50;
+    int n_timesteps = 10;
 
     std::vector<std::shared_ptr<Particle>> delayed_neutron_bank; // delayed neutron source from the last time step, C*psi_(n-1)
-    std::vector<std::shared_ptr<Particle>> new_delayed_neutron_bank; // delayed neutron source created the last time step, C*psi_(n-1)
+    std::vector<std::shared_ptr<Particle>> new_delayed_neutron_bank; // delayed neutron source from the current time step, C*psi_(n)
 
-    std::vector<std::vector<double>> beta_counts(100,std::vector<double>(6,0));
+    std::vector<std::vector<double>> beta_counts(n_timesteps,std::vector<double>(6,0)); // tally of beta-effective
 
     // progress through time steps
-    for (double t = 0; t < deltaT * 100; t=t + deltaT) {
+    for (double t = 0; t < deltaT * n_timesteps; t=t + deltaT) {
         // create bank for initial guess of fission source, B*psi_n
         std::vector<std::shared_ptr<Particle>> part_bank;
         Position initial_pos = {0,0,0};
@@ -116,29 +121,30 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
                     p->move(fission_source_bank, new_delayed_neutron_bank, cycle >= inactive_cycles, source_particles, deltaT, t/deltaT, rng);
                 }
             }
-            //std::cout << "Source particles: " << source_particles << std::endl;
-            //std::cout << "Delayed neutrons in bank: " << delayed_neutron_bank.size() << std::endl;
-            double k = 1.0 * source_particles / sumBankWeights(part_bank);
+            std::cout << "part bank weight: " << sumBankWeights(part_bank) << std::endl;
+            std::cout << "part bank size: " << part_bank.size() << std::endl;
+            double k = 1.0 * source_particles / (sumBankWeights(part_bank) + sumBankWeights(delayed_neutron_bank));
             if (cycle >= inactive_cycles) {
                 k_eig_sum += k;
             }
             std::cout << "k = " << k << " for cycle " << cycle << std::endl;
 
+            weightWindows(fission_source_bank, 0.1, 10, 1, rng);
+
             // TODO: adjust particles' weights by k to maintain weight, then do splitting/routletting if necessary
             double weight_adjustment = initial_particles / sumBankWeights(fission_source_bank);
             part_bank = fission_source_bank; // set new fission source iteration bank
 
-            // renormalize fission source bank weight
+
+            // resize fission source bank weight
             for (std::shared_ptr<Particle> p:part_bank) {
                 p->multiplyWeight(weight_adjustment);
             }
-
             comb(part_bank, initial_particles);
 
             double total_fission_source_weight = sumBankWeights(part_bank);
-            //std::cout << "part_bank weight: " << total_fission_source_weight << "\n" << std::endl;
 
-             // calculate "adjoint weighted" lifetime for 10 generations back
+            // calculate "adjoint weighted" lifetime for 10 generations back
             if (cycle > inactive_cycles + 10) {
                 double lifetimeTotal = 0;
                 std::vector<double> betaTotals = {0,0,0,0,0,0};
@@ -165,7 +171,7 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
 
             // print and clear tallies
             if (cycle == cycles - 1) {
-                //geo->printFluxes();
+                geo->printFluxes();
             }
             if (cycle == inactive_cycles - 1) {
                 geo->clearTallies();
@@ -175,24 +181,29 @@ void runTransientFixedSource(Geometry *geo, double deltaT) {
         geo->clearTallies();
 
         delayed_neutron_bank.clear();
+
+        comb(new_delayed_neutron_bank, delayed_bank_max_size); // prevent exponential growth of delayed_neutron_bank size
+
         // set up delayed neutron bank for next time step
         for (std::shared_ptr<Particle> p:new_delayed_neutron_bank) {
-            delayed_neutron_bank.push_back(std::make_shared<Particle>(*p));
+            std::shared_ptr<Particle> delayed_p = std::make_shared<Particle>(*p);
+            delayed_p->multiplyWeight(1/(float(cycles-inactive_cycles))); // adjust weight of delayed particles because they come from every active cycle
+            delayed_neutron_bank.push_back(delayed_p);
         }
+        //weightWindows(delayed_neutron_bank, 0.01, 10, 1, rng);
 
-        // adjust weights of delayed neutrons for next time step (term 3 in Evan's dissertation TFS equation)
+        // adjust weights of delayed neutrons for time steps after the next time step (term 3 in Evan's dissertation TFS equation)
         for (std::shared_ptr<Particle> p:new_delayed_neutron_bank) {
-            p->f1WeightAdjust(deltaT); // hardcode group 1 as delayed neutron group, using 1 group delayed neutrons, use 6 in future
+            p->f1WeightAdjust(deltaT);
         }
-        
+        double total_new_bank_weight = sumBankWeights(new_delayed_neutron_bank);
+        std::cout << "New Delayed bank total weight: " << total_new_bank_weight << std::endl;
+
 
         // Comb delayed neutron bank (keep size of delayed neutron vector under max value)
         double total_bank_weight = sumBankWeights(delayed_neutron_bank);
         std::cout << "Delayed bank total weight: " << total_bank_weight << std::endl;
-        weightWindows(delayed_neutron_bank, 0.01, 10, 1, rng);
-        comb(delayed_neutron_bank, delayed_bank_max_size);
-        total_bank_weight = sumBankWeights(delayed_neutron_bank);
-        std::cout << "Delayed bank total weight: " << total_bank_weight << std::endl;
+        std::cout << "Delayed bank size: " << delayed_neutron_bank.size() << std::endl;
 
         // Weight windows: low-weight neutrons in delayed neutron bank
         // weightWindows(delayed_neutron_bank, 0.01, 10, 1, rng);
